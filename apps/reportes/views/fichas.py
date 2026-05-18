@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -14,7 +14,8 @@ from io import BytesIO
 import qrcode
 import os
 from PIL import Image as PILImage
-from organizacion.models import Local, Area, Oficina
+from organizacion.models import Local, Area, Oficina, Entidad
+from personal.models import Personal
 from bienes.models import Bien
 
 
@@ -509,9 +510,390 @@ def generar_ficha_vehiculo(request, bien_id):
         ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
     ]))
     elements.append(detalle_tecnico_table)
-    
+
     # Construir PDF
     doc.build(elements)
     return response
 
 
+# ==============================================================================
+# ANEXO N° 03 - FICHA DE ASIGNACIÓN EN USO Y DEVOLUCIÓN DE BIENES PATRIMONIALES
+# ==============================================================================
+
+def _meses_es():
+    return [
+        '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ]
+
+
+def ficha_anexo03_index(request):
+    """Página de selección de usuario y bienes para generar el Anexo N° 03."""
+    entidad = Entidad.objects.first()
+    entidad_nombre = entidad.nombre if entidad else "Municipalidad Distrital de José Luis Bustamante y Rivero"
+    return render(request, 'inventario/ficha_anexo03_seleccion.html', {
+        'entidad_nombre': entidad_nombre,
+    })
+
+
+@require_http_methods(["GET"])
+def buscar_personal_anexo03(request):
+    """AJAX: busca personal por nombre, apellido o DNI para el Select2 del Anexo N° 03."""
+    query = (request.GET.get('q') or '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    personal = Personal.objects.select_related('area', 'oficina').filter(
+        Q(nombres__icontains=query) |
+        Q(apellidos__icontains=query) |
+        Q(numero_documento__icontains=query)
+    ).order_by('apellidos', 'nombres')[:25]
+
+    results = []
+    for p in personal:
+        area_nombre = p.area.nombre if p.area else ''
+        results.append({
+            'id': p.id,
+            'text': f"{p.apellidos}, {p.nombres} — DNI: {p.numero_documento}" + (f" ({area_nombre})" if area_nombre else "")
+        })
+    return JsonResponse({'results': results})
+
+
+@require_http_methods(["GET"])
+def datos_personal_anexo03(request):
+    """AJAX: retorna los datos del usuario para rellenar el formulario."""
+    personal_id = request.GET.get('personal_id')
+    if not personal_id or not str(personal_id).isdigit():
+        return JsonResponse({'error': 'ID inválido'}, status=400)
+
+    personal = get_object_or_404(
+        Personal.objects.select_related('area', 'area__local', 'oficina'),
+        pk=personal_id
+    )
+
+    local_nombre = ''
+    if personal.area and personal.area.local:
+        local_nombre = personal.area.local.nombre
+
+    return JsonResponse({
+        'id': personal.id,
+        'nombre_completo': f"{personal.apellidos}, {personal.nombres}",
+        'dni': personal.numero_documento,
+        'area': personal.area.nombre if personal.area else '',
+        'oficina': personal.oficina.nombre if personal.oficina else '',
+        'local': local_nombre,
+        'cargo': personal.cargo or '',
+    })
+
+
+@require_http_methods(["GET"])
+def bienes_personal_anexo03(request):
+    """AJAX: lista los bienes activos asignados al usuario seleccionado."""
+    personal_id = request.GET.get('personal_id')
+    if not personal_id or not str(personal_id).isdigit():
+        return JsonResponse({'error': 'ID inválido', 'bienes': []}, status=400)
+
+    bienes = Bien.objects.select_related('denominacion').filter(
+        usuario_asignado_id=int(personal_id)
+    ).exclude(estado='BAJA').order_by('codigo_patrimonial')
+
+    data = []
+    for b in bienes:
+        denominacion = b.descripcion or (b.denominacion.nombre if b.denominacion else '')
+        data.append({
+            'id': b.id,
+            'codigo_patrimonial': b.codigo_patrimonial or '',
+            'denominacion': denominacion,
+            'marca': b.marca or '',
+            'modelo': b.modelo or '',
+            'serie': b.serie or '',
+            'color': b.color or '',
+            'resolucion_alta': b.resolucion_alta or '',
+            'estado': b.estado,
+            'estado_label': b.get_estado_display(),
+        })
+
+    return JsonResponse({'bienes': data})
+
+
+@require_http_methods(["POST"])
+def generar_ficha_anexo03(request):
+    """Genera el PDF del Anexo N° 03 con los bienes seleccionados."""
+    personal_id = request.POST.get('personal_id')
+    bien_ids = request.POST.getlist('bien_ids')
+    entidad_input = (request.POST.get('entidad') or '').strip()
+    correo = (request.POST.get('correo') or '').strip()
+    direccion = (request.POST.get('direccion') or '').strip()
+    fecha_str = (request.POST.get('fecha') or '').strip()
+
+    if not personal_id or not bien_ids:
+        return HttpResponse("Debe seleccionar un usuario y al menos un bien.", status=400)
+
+    personal = get_object_or_404(
+        Personal.objects.select_related('area', 'area__local', 'oficina'),
+        pk=personal_id
+    )
+
+    bienes = Bien.objects.select_related('denominacion').filter(
+        pk__in=bien_ids,
+        usuario_asignado_id=personal.id
+    ).exclude(estado='BAJA').order_by('codigo_patrimonial')
+
+    if not bienes.exists():
+        return HttpResponse("No se encontraron bienes válidos para este usuario.", status=400)
+
+    # Fecha de la ficha
+    try:
+        fecha_ficha = datetime.strptime(fecha_str, '%Y-%m-%d').date() if fecha_str else datetime.now().date()
+    except ValueError:
+        fecha_ficha = datetime.now().date()
+
+    # Datos institucionales / ubicación
+    area_nombre = personal.area.nombre if personal.area else ''
+    local_nombre = personal.area.local.nombre if (personal.area and personal.area.local) else ''
+    entidad_nombre = entidad_input or (
+        personal.area.local.entidad.nombre
+        if personal.area and personal.area.local and personal.area.local.entidad
+        else "Municipalidad Distrital de José Luis Bustamante y Rivero"
+    )
+
+    # --- Generar PDF ---
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"anexo03_{personal.numero_documento}_{fecha_ficha.strftime('%Y%m%d')}.pdf"
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+
+    doc = SimpleDocTemplate(
+        response,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.2 * cm,
+        bottomMargin=1.2 * cm,
+    )
+    elements = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'AnexoTitle', parent=styles['Normal'],
+        fontSize=11, fontName='Helvetica-Bold', alignment=TA_CENTER, leading=14
+    )
+    label_style = ParagraphStyle(
+        'AnexoLabel', parent=styles['Normal'],
+        fontSize=9, fontName='Helvetica-Bold', alignment=TA_LEFT, leading=11
+    )
+    value_style = ParagraphStyle(
+        'AnexoValue', parent=styles['Normal'],
+        fontSize=9, fontName='Helvetica', alignment=TA_LEFT, leading=11
+    )
+    small_style = ParagraphStyle(
+        'AnexoSmall', parent=styles['Normal'],
+        fontSize=8, fontName='Helvetica', alignment=TA_LEFT, leading=10
+    )
+    cell_style = ParagraphStyle(
+        'AnexoCell', parent=styles['Normal'],
+        fontSize=8, fontName='Helvetica', alignment=TA_LEFT, leading=10
+    )
+    cell_center = ParagraphStyle(
+        'AnexoCellCenter', parent=styles['Normal'],
+        fontSize=8, fontName='Helvetica', alignment=TA_CENTER, leading=10
+    )
+
+    # Encabezado: ANEXO N° 03 + título
+    elements.append(Paragraph("ANEXO N° 03", title_style))
+    elements.append(Paragraph(
+        "FICHA DE ASIGNACIÓN EN USO Y DEVOLUCIÓN DE BIENES MUEBLES PATRIMONIALES",
+        title_style
+    ))
+    elements.append(Spacer(1, 0.4 * cm))
+
+    # Entidad + Fecha (dos columnas)
+    fecha_dia = fecha_ficha.strftime('%d')
+    fecha_mes = fecha_ficha.strftime('%m')
+    fecha_anio = fecha_ficha.strftime('%Y')
+    fecha_texto = f"{fecha_dia} / {fecha_mes} / {fecha_anio}"
+
+    encabezado_data = [
+        [
+            Paragraph("<b>ENTIDAD U ORGANIZACIÓN DE LA ENTIDAD:</b>", label_style),
+            Paragraph("<b>FECHA:</b>", label_style),
+        ],
+        [
+            Paragraph(entidad_nombre, value_style),
+            Paragraph(fecha_texto, value_style),
+        ],
+    ]
+    encabezado_table = Table(encabezado_data, colWidths=[19 * cm, 7.7 * cm])
+    encabezado_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (0, 1), (0, 1), 0.5, colors.black),
+        ('BOX', (1, 1), (1, 1), 0.5, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(encabezado_table)
+    elements.append(Spacer(1, 0.3 * cm))
+
+    # DATOS DEL USUARIO
+    usuario_data = [
+        [Paragraph("<b>DATOS DEL USUARIO</b>", label_style), '', '', ''],
+        [
+            Paragraph("Nombres y apellidos", cell_style),
+            Paragraph(f"{personal.nombres} {personal.apellidos}", cell_style),
+            Paragraph("N° DNI", cell_style),
+            Paragraph(personal.numero_documento or '', cell_style),
+        ],
+        [
+            Paragraph("Correo electrónico", cell_style),
+            Paragraph(correo, cell_style),
+            '', '',
+        ],
+        [
+            Paragraph("Órgano o Unidad Orgánica", cell_style),
+            Paragraph(area_nombre, cell_style),
+            '', '',
+        ],
+        [
+            Paragraph("Local o sede", cell_style),
+            Paragraph(local_nombre, cell_style),
+            '', '',
+        ],
+        [
+            Paragraph("Dirección<super>(1)</super>", cell_style),
+            Paragraph(direccion, cell_style),
+            '', '',
+        ],
+    ]
+    usuario_table = Table(usuario_data, colWidths=[4.5 * cm, 11 * cm, 3.2 * cm, 8 * cm])
+    usuario_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#D9D9D9')),
+        ('SPAN', (0, 0), (-1, 0)),
+        ('SPAN', (1, 2), (3, 2)),
+        ('SPAN', (1, 3), (3, 3)),
+        ('SPAN', (1, 4), (3, 4)),
+        ('SPAN', (1, 5), (3, 5)),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(usuario_table)
+    elements.append(Spacer(1, 0.4 * cm))
+
+    # TABLA DE BIENES
+    header_style = ParagraphStyle(
+        'AnexoHeader', parent=styles['Normal'],
+        fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER, leading=10
+    )
+
+    # Headers: N° Orden | DESCRIPCIÓN (Código, Denominación, Marca, Modelo, Color, Serie, Otros, Estado) | Observaciones
+    bienes_data = [
+        [
+            Paragraph("N° DE<br/>ORDEN", header_style),
+            Paragraph("DESCRIPCIÓN<super>(2)</super>", header_style),
+            '', '', '', '', '', '', '',
+            Paragraph("OBSERVACIONES", header_style),
+        ],
+        [
+            '',
+            Paragraph("CÓDIGO<br/>PATRIMONIAL", header_style),
+            Paragraph("DENOMINACIÓN", header_style),
+            Paragraph("MARCA", header_style),
+            Paragraph("MODELO", header_style),
+            Paragraph("COLOR", header_style),
+            Paragraph("SERIE", header_style),
+            Paragraph("OTROS", header_style),
+            Paragraph("ESTADO DE<br/>CONSERVACIÓN<super>(3)</super>", header_style),
+            '',
+        ],
+    ]
+
+    for idx, b in enumerate(bienes, start=1):
+        denominacion = b.descripcion or (b.denominacion.nombre if b.denominacion else '')
+        otros = ''
+        if b.placa:
+            otros = f"Placa: {b.placa}"
+        elif b.dimension:
+            otros = b.dimension
+        bienes_data.append([
+            Paragraph(str(idx), cell_center),
+            Paragraph(b.codigo_patrimonial or '', cell_center),
+            Paragraph(denominacion, cell_style),
+            Paragraph(b.marca or '', cell_style),
+            Paragraph(b.modelo or '', cell_style),
+            Paragraph(b.color or '', cell_style),
+            Paragraph(b.serie or '', cell_style),
+            Paragraph(otros, cell_style),
+            Paragraph(b.get_estado_display(), cell_center),
+            Paragraph('', cell_style),  # Observaciones (en blanco para llenado manual)
+        ])
+
+    # Anchos de columna en A4 horizontal (suma ≈ 26.7 cm útil)
+    col_widths = [1.3 * cm, 2.5 * cm, 5.5 * cm, 2.5 * cm, 2.5 * cm, 1.7 * cm, 2.7 * cm, 2.3 * cm, 2.3 * cm, 3.4 * cm]
+    bienes_table = Table(bienes_data, colWidths=col_widths, repeatRows=2)
+    bienes_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 1), colors.HexColor('#F2F2F2')),
+        ('SPAN', (0, 0), (0, 1)),       # N° DE ORDEN ocupa 2 filas
+        ('SPAN', (1, 0), (8, 0)),       # DESCRIPCIÓN abarca 8 columnas
+        ('SPAN', (9, 0), (9, 1)),       # OBSERVACIONES ocupa 2 filas
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 2),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(bienes_table)
+    elements.append(Spacer(1, 0.3 * cm))
+
+    # Notas al pie
+    notas = [
+        "(1) Se consigna para el caso de entrega o devolución de bienes muebles patrimoniales para teletrabajo",
+        "(2) En caso de vehículos, se utiliza adicionalmente el Formato de Ficha Técnica de Vehículo, contemplado en el Anexo N° 08",
+        "(3) El estado es consignado en base a la siguiente escala: nuevo, bueno, regular o malo. En caso de semovientes, utilizar escala de acuerdo a su naturaleza.",
+    ]
+    for nota in notas:
+        elements.append(Paragraph(nota, small_style))
+    elements.append(Spacer(1, 0.3 * cm))
+
+    # CONSIDERACIONES
+    consideraciones_titulo = ParagraphStyle(
+        'ConsidTitle', parent=styles['Normal'],
+        fontSize=9, fontName='Helvetica-Bold', alignment=TA_LEFT, leading=11,
+        underlineWidth=0.5
+    )
+    elements.append(Paragraph("<u><b>CONSIDERACIONES:</b></u>", consideraciones_titulo))
+    elements.append(Spacer(1, 0.15 * cm))
+
+    consideraciones = [
+        "El usuario es responsable de la permanencia y conservación de cada uno de los bienes descritos, recomendándose tomar las precauciones del caso para evitar sustracciones, deterioros, etc.",
+        "Cualquier necesidad de traslado del bien mueble patrimonial dentro o fuera del local de la Entidad u Organización de la Entidad, es previamente comunicado al encargado de la OCP.",
+    ]
+    bullet_style = ParagraphStyle(
+        'AnexoBullet', parent=styles['Normal'],
+        fontSize=8, fontName='Helvetica', alignment=TA_LEFT, leading=10,
+        leftIndent=14, bulletIndent=4
+    )
+    for item in consideraciones:
+        elements.append(Paragraph(f"➢ {item}", bullet_style))
+    elements.append(Spacer(1, 1.2 * cm))
+
+    # Firmas
+    firmas_data = [
+        ['___________________________________________', '', '___________________________________________'],
+        [Paragraph('<b>Usuario</b>', cell_center), '', Paragraph('<b>Personal de la OCP</b>', cell_center)],
+    ]
+    firmas_table = Table(firmas_data, colWidths=[10 * cm, 6.7 * cm, 10 * cm])
+    firmas_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(firmas_table)
+
+    doc.build(elements)
+    return response

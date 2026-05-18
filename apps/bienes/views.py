@@ -821,8 +821,9 @@ def bienes_datatable(request):
         5: 'tasa_depreciacion',
         6: 'vida_util_meses',
         7: 'fecha_pecosa',
-        8: 'usuario_asignado__apellidos',
-        9: 'oficina__nombre',
+        8: 'resolucion_alta',
+        9: 'usuario_asignado__apellidos',
+        10: 'oficina__nombre',
     }
     order_field = order_map.get(order_column, 'codigo_patrimonial')
     if order_dir == 'desc':
@@ -892,7 +893,8 @@ def bienes_datatable(request):
         tasa = f"{bien.tasa_depreciacion:,.2f}" if bien.tasa_depreciacion is not None else '-'
         vida_util = f"{bien.vida_util_meses}" if bien.vida_util_meses is not None else '-'
         fecha_pecosa = bien.fecha_pecosa.strftime('%d/%m/%Y') if bien.fecha_pecosa else '-'
-        
+        resolucion = escape(bien.resolucion_alta) if bien.resolucion_alta else '-'
+
         # Validación de usuario para evitar posibles caídas
         usuario = escape(str(bien.usuario_asignado)) if bien.usuario_asignado else 'Sin asignar'
         oficina = escape(truncate_words(bien.oficina.nombre, 3)) if bien.oficina else '-'
@@ -920,6 +922,7 @@ def bienes_datatable(request):
             tasa,
             vida_util,
             fecha_pecosa,
+            resolucion,
             usuario,
             oficina,
             acciones,

@@ -1,0 +1,477 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ficha Anexo N° 03 - Asignación en Uso{% endblock %}
+
+{% block page_title %}Ficha Anexo N° 03{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<style>
+    .select2-container--default .select2-selection--single {
+        height: 42px;
+        padding: 6px 10px;
+        border: 1px solid #ced4da;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 40px;
+    }
+    .badge-anexo {
+        font-size: 0.85rem;
+        padding: 0.45em 0.9em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-primary badge-anexo mb-2">ANEXO N° 03</span>
+                <h3 class="mb-0">Ficha de Asignación en Uso y Devolución de Bienes Muebles Patrimoniales</h3>
+            </div>
+            <a href="{% url 'inventario:fichas_index' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Volver a Fichas
+            </a>
+        </div>
+    </div>
+</div>
+
+<form id="formAnexo03" method="post" action="{% url 'inventario:generar_ficha_anexo03' %}" target="_blank">
+    {% csrf_token %}
+
+    <!-- Paso 1: Datos generales -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <strong><i class="fas fa-info-circle me-2"></i>1. Datos generales</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label"><strong>Entidad u organización:</strong></label>
+                    <input type="text" name="entidad" class="form-control"
+                           value="{{ entidad_nombre }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label"><strong>Fecha:</strong></label>
+                    <input type="date" name="fecha" id="fechaAnexo" class="form-control" required>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 2: Selección de usuario -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <strong><i class="fas fa-user me-2"></i>2. Selección de Usuario</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <label class="form-label"><strong>Buscar Personal:</strong></label>
+                    <select id="selectPersonal" name="personal_id" class="form-select" required>
+                        <option value="">Escriba el nombre o DNI del trabajador...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Datos del usuario (se rellenan tras seleccionar) -->
+            <div id="datosUsuario" class="mt-4 d-none">
+                <h6 class="text-primary mb-3"><i class="fas fa-id-card me-2"></i>Datos del usuario</h6>
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label small mb-1">Nombres y apellidos</label>
+                        <input type="text" id="usuarioNombre" class="form-control" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-1">N° DNI</label>
+                        <input type="text" id="usuarioDni" class="form-control" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Correo electrónico</label>
+                        <input type="email" name="correo" class="form-control"
+                               placeholder="Ej: trabajador@munibustamante.gob.pe">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Órgano o Unidad Orgánica</label>
+                        <input type="text" id="usuarioArea" name="area_nombre" class="form-control" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Local o sede</label>
+                        <input type="text" id="usuarioLocal" name="local_nombre" class="form-control" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-1">Dirección <span class="text-muted">(solo para teletrabajo)</span></label>
+                        <input type="text" name="direccion" class="form-control"
+                               placeholder="Dirección domiciliaria (opcional)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 3: Selección de bienes -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <strong><i class="fas fa-boxes me-2"></i>3. Bienes asignados al usuario</strong>
+            <span id="badgeContador" class="badge bg-light text-dark">0 bienes</span>
+        </div>
+        <div class="card-body">
+            <div id="mensajeSinUsuario" class="alert alert-info mb-0">
+                <i class="fas fa-info-circle me-2"></i>Seleccione primero un usuario para ver sus bienes asignados.
+            </div>
+
+            <div id="contenedorBienes" class="d-none">
+                <!-- Filtros -->
+                <div class="bg-light border rounded p-3 mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label small mb-1"><strong><i class="fas fa-search me-1"></i>Buscar:</strong></label>
+                            <input type="text" id="filtroTexto" class="form-control form-control-sm"
+                                   placeholder="Código, denominación, marca, modelo, serie, OC...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1"><strong>Estado:</strong></label>
+                            <select id="filtroEstado" class="form-select form-select-sm">
+                                <option value="">Todos</option>
+                                <option value="NUEVO">Nuevo</option>
+                                <option value="BUENO">Bueno</option>
+                                <option value="REGULAR">Regular</option>
+                                <option value="MALO">Malo</option>
+                                <option value="CHADARRA">Chatarra</option>
+                                <option value="RAEE">RAEE</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1"><strong>OC / Resol. Alta:</strong></label>
+                            <input type="text" id="filtroResolucion" class="form-control form-control-sm"
+                                   placeholder="Ej: 2211, OC/2122...">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" id="btnLimpiarFiltros" class="btn btn-sm btn-outline-secondary w-100" title="Limpiar filtros">
+                                <i class="fas fa-eraser"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <button type="button" id="btnSeleccionarTodos" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-check-square me-1"></i>Seleccionar visibles
+                        </button>
+                        <button type="button" id="btnDeseleccionarTodos" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-square me-1"></i>Deseleccionar visibles
+                        </button>
+                    </div>
+                    <small class="text-muted">Marque los bienes que desea incluir en la ficha. Los filtros se aplican en tiempo real.</small>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-sm align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 45px;" class="text-center">
+                                    <input type="checkbox" id="chkSeleccionarTodos" class="form-check-input">
+                                </th>
+                                <th style="width: 115px;">Cód. Patrimonial</th>
+                                <th>Denominación</th>
+                                <th style="width: 90px;">Marca</th>
+                                <th style="width: 90px;">Modelo</th>
+                                <th style="width: 105px;">Serie</th>
+                                <th style="width: 110px;">OC / Resol. Alta</th>
+                                <th style="width: 90px;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyBienes">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="mensajeSinBienes" class="alert alert-warning d-none">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Este usuario no tiene bienes asignados activos.
+                </div>
+                <div id="mensajeSinResultados" class="alert alert-info d-none">
+                    <i class="fas fa-filter me-2"></i>Ningún bien coincide con los filtros aplicados.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div id="alertaErrores" class="alert alert-danger d-none" role="alert"></div>
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'inventario:fichas_index' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </a>
+                <button type="submit" id="btnGenerarPDF" class="btn btn-primary" disabled>
+                    <i class="fas fa-file-pdf me-2"></i>Generar Ficha PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Fecha por defecto: hoy
+    const hoy = new Date().toISOString().split('T')[0];
+    $('#fechaAnexo').val(hoy);
+
+    // Select2 para búsqueda de personal
+    $('#selectPersonal').select2({
+        placeholder: 'Escriba el nombre o DNI del trabajador...',
+        allowClear: true,
+        width: '100%',
+        minimumInputLength: 2,
+        language: {
+            inputTooShort: () => 'Ingrese al menos 2 caracteres',
+            noResults: () => 'No se encontraron trabajadores',
+            searching: () => 'Buscando...'
+        },
+        ajax: {
+            url: '{% url "inventario:buscar_personal_anexo03" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return { q: params.term || '' };
+            },
+            processResults: function(data) {
+                return { results: data.results || [] };
+            },
+            cache: true
+        }
+    });
+
+    // Al seleccionar un usuario
+    $('#selectPersonal').on('select2:select', function(e) {
+        const personalId = e.params.data.id;
+        cargarDatosUsuario(personalId);
+        cargarBienesUsuario(personalId);
+    });
+
+    $('#selectPersonal').on('select2:clear', function() {
+        resetearVistaUsuario();
+    });
+
+    function resetearVistaUsuario() {
+        $('#datosUsuario').addClass('d-none');
+        $('#mensajeSinUsuario').removeClass('d-none');
+        $('#contenedorBienes').addClass('d-none');
+        $('#tbodyBienes').empty();
+        $('#badgeContador').text('0 bienes');
+        $('#btnGenerarPDF').prop('disabled', true);
+    }
+
+    function cargarDatosUsuario(personalId) {
+        $.ajax({
+            url: '{% url "inventario:datos_personal_anexo03" %}',
+            method: 'GET',
+            data: { personal_id: personalId },
+            success: function(data) {
+                $('#usuarioNombre').val(data.nombre_completo || '');
+                $('#usuarioDni').val(data.dni || '');
+                $('#usuarioArea').val(data.area || '');
+                $('#usuarioLocal').val(data.local || '');
+                $('#datosUsuario').removeClass('d-none');
+            },
+            error: function() {
+                mostrarError('Error al cargar los datos del usuario.');
+            }
+        });
+    }
+
+    function cargarBienesUsuario(personalId) {
+        $('#mensajeSinUsuario').addClass('d-none');
+        $('#contenedorBienes').removeClass('d-none');
+        $('#mensajeSinResultados').addClass('d-none');
+        $('#tbodyBienes').html('<tr><td colspan="8" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando bienes...</td></tr>');
+
+        // Limpiar filtros previos al cambiar de usuario
+        $('#filtroTexto').val('');
+        $('#filtroEstado').val('');
+        $('#filtroResolucion').val('');
+
+        $.ajax({
+            url: '{% url "inventario:bienes_personal_anexo03" %}',
+            method: 'GET',
+            data: { personal_id: personalId },
+            success: function(data) {
+                const tbody = $('#tbodyBienes');
+                tbody.empty();
+
+                if (!data.bienes || data.bienes.length === 0) {
+                    $('#mensajeSinBienes').removeClass('d-none');
+                    $('#badgeContador').text('0 bienes');
+                    $('#btnGenerarPDF').prop('disabled', true);
+                    return;
+                }
+
+                $('#mensajeSinBienes').addClass('d-none');
+
+                data.bienes.forEach(function(bien) {
+                    // Texto concatenado para búsqueda rápida (data-search)
+                    const searchBlob = [
+                        bien.codigo_patrimonial, bien.denominacion, bien.marca,
+                        bien.modelo, bien.serie, bien.color, bien.resolucion_alta
+                    ].join(' ').toLowerCase();
+
+                    const row = `
+                        <tr class="fila-bien"
+                            data-estado="${bien.estado}"
+                            data-resolucion="${(bien.resolucion_alta || '').toLowerCase()}"
+                            data-search="${escapeHtml(searchBlob)}">
+                            <td class="text-center">
+                                <input type="checkbox" name="bien_ids" value="${bien.id}" class="form-check-input chk-bien" checked>
+                            </td>
+                            <td><strong>${escapeHtml(bien.codigo_patrimonial)}</strong></td>
+                            <td>${escapeHtml(bien.denominacion)}</td>
+                            <td>${escapeHtml(bien.marca)}</td>
+                            <td>${escapeHtml(bien.modelo)}</td>
+                            <td>${escapeHtml(bien.serie)}</td>
+                            <td>${escapeHtml(bien.resolucion_alta)}</td>
+                            <td><span class="badge bg-${badgeColor(bien.estado)}">${escapeHtml(bien.estado_label)}</span></td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+
+                aplicarFiltros();
+                actualizarContador();
+                $('#btnGenerarPDF').prop('disabled', false);
+            },
+            error: function() {
+                $('#tbodyBienes').html('<tr><td colspan="8" class="text-center text-danger">Error al cargar los bienes.</td></tr>');
+            }
+        });
+    }
+
+    // ====== FILTROS EN VIVO ======
+    function aplicarFiltros() {
+        const texto = ($('#filtroTexto').val() || '').trim().toLowerCase();
+        const estado = $('#filtroEstado').val() || '';
+        const resolucion = ($('#filtroResolucion').val() || '').trim().toLowerCase();
+
+        let visibles = 0;
+        $('#tbodyBienes tr.fila-bien').each(function() {
+            const $fila = $(this);
+            const blob = $fila.attr('data-search') || '';
+            const estadoFila = $fila.attr('data-estado') || '';
+            const resolucionFila = $fila.attr('data-resolucion') || '';
+
+            const coincideTexto = !texto || blob.indexOf(texto) > -1;
+            const coincideEstado = !estado || estadoFila === estado;
+            const coincideResolucion = !resolucion || resolucionFila.indexOf(resolucion) > -1;
+
+            if (coincideTexto && coincideEstado && coincideResolucion) {
+                $fila.show();
+                visibles++;
+            } else {
+                $fila.hide();
+            }
+        });
+
+        // Mensaje cuando no hay resultados
+        const total = $('#tbodyBienes tr.fila-bien').length;
+        if (total > 0 && visibles === 0) {
+            $('#mensajeSinResultados').removeClass('d-none');
+        } else {
+            $('#mensajeSinResultados').addClass('d-none');
+        }
+
+        actualizarContador();
+    }
+
+    // Listeners de filtros (en vivo)
+    $('#filtroTexto, #filtroResolucion').on('input', aplicarFiltros);
+    $('#filtroEstado').on('change', aplicarFiltros);
+    $('#btnLimpiarFiltros').on('click', function() {
+        $('#filtroTexto').val('');
+        $('#filtroEstado').val('');
+        $('#filtroResolucion').val('');
+        aplicarFiltros();
+    });
+
+    function escapeHtml(text) {
+        if (text === null || text === undefined || text === '') return '-';
+        return $('<div>').text(text).html();
+    }
+
+    function badgeColor(estado) {
+        switch (estado) {
+            case 'NUEVO': return 'success';
+            case 'BUENO': return 'info';
+            case 'REGULAR': return 'warning';
+            case 'MALO': return 'danger';
+            default: return 'secondary';
+        }
+    }
+
+    function actualizarContador() {
+        // El "total" considera todos los bienes del usuario; los "seleccionados" cuentan todos los marcados (visibles u ocultos)
+        const total = $('.chk-bien').length;
+        const seleccionados = $('.chk-bien:checked').length;
+        const visibles = $('#tbodyBienes tr.fila-bien:visible').length;
+        $('#badgeContador').text(`${seleccionados} marcados / ${visibles} visibles / ${total} totales`);
+        $('#btnGenerarPDF').prop('disabled', seleccionados === 0);
+
+        // Sincronizar el "Seleccionar todos" según las filas visibles
+        const visiblesChk = $('#tbodyBienes tr.fila-bien:visible .chk-bien');
+        const visiblesChecked = visiblesChk.filter(':checked');
+        $('#chkSeleccionarTodos').prop('checked',
+            visiblesChk.length > 0 && visiblesChk.length === visiblesChecked.length);
+    }
+
+    // Selección masiva (solo afecta a las filas VISIBLES)
+    $('#chkSeleccionarTodos').on('change', function() {
+        const marcar = $(this).prop('checked');
+        $('#tbodyBienes tr.fila-bien:visible .chk-bien').prop('checked', marcar);
+        actualizarContador();
+    });
+    $('#btnSeleccionarTodos').on('click', function() {
+        $('#tbodyBienes tr.fila-bien:visible .chk-bien').prop('checked', true);
+        actualizarContador();
+    });
+    $('#btnDeseleccionarTodos').on('click', function() {
+        $('#tbodyBienes tr.fila-bien:visible .chk-bien').prop('checked', false);
+        actualizarContador();
+    });
+
+    // Actualizar contador al marcar
+    $(document).on('change', '.chk-bien', function() {
+        actualizarContador();
+    });
+
+    // Validación antes de enviar
+    $('#formAnexo03').on('submit', function(e) {
+        // Excluir del POST los bienes ocultos por los filtros:
+        // solo se imprimen los que están visibles Y marcados al momento de generar.
+        $('#tbodyBienes tr.fila-bien:hidden .chk-bien').prop('checked', false);
+
+        const seleccionados = $('#tbodyBienes tr.fila-bien:visible .chk-bien:checked').length;
+        if (seleccionados === 0) {
+            e.preventDefault();
+            mostrarError('Debe seleccionar al menos un bien visible para generar la ficha. Revise los filtros aplicados.');
+            return false;
+        }
+        if (!$('#selectPersonal').val()) {
+            e.preventDefault();
+            mostrarError('Debe seleccionar un usuario.');
+            return false;
+        }
+        $('#alertaErrores').addClass('d-none');
+    });
+
+    function mostrarError(msg) {
+        $('#alertaErrores').removeClass('d-none').html(`<i class="fas fa-exclamation-triangle me-2"></i>${msg}`);
+        $('html, body').animate({ scrollTop: $('#alertaErrores').offset().top - 100 }, 300);
+    }
+});
+</script>
+{% endblock %}

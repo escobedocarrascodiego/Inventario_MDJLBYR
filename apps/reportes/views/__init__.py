@@ -22,4 +22,9 @@ from .fichas import (
     buscar_bienes_para_ficha,
     generar_ficha_computo,
     generar_ficha_vehiculo,
+    ficha_anexo03_index,
+    buscar_personal_anexo03,
+    datos_personal_anexo03,
+    bienes_personal_anexo03,
+    generar_ficha_anexo03,
 )

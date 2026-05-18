@@ -28,4 +28,11 @@ urlpatterns = [
     path('ajax/buscar-bienes-para-ficha/', views.buscar_bienes_para_ficha, name='buscar_bienes_para_ficha'),
     path('funciones/fichas/computo/<int:bien_id>/', views.generar_ficha_computo, name='ficha_computo'),
     path('funciones/fichas/vehiculo/<int:bien_id>/', views.generar_ficha_vehiculo, name='ficha_vehiculo'),
+
+    # URLs para Ficha Anexo N° 03 (Asignación en uso y devolución)
+    path('funciones/fichas/anexo03/', views.ficha_anexo03_index, name='ficha_anexo03_index'),
+    path('ajax/anexo03/buscar-personal/', views.buscar_personal_anexo03, name='buscar_personal_anexo03'),
+    path('ajax/anexo03/datos-personal/', views.datos_personal_anexo03, name='datos_personal_anexo03'),
+    path('ajax/anexo03/bienes-personal/', views.bienes_personal_anexo03, name='bienes_personal_anexo03'),
+    path('funciones/fichas/anexo03/generar/', views.generar_ficha_anexo03, name='generar_ficha_anexo03'),
 ]
