@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Consulta Histórica - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Consulta Histórica{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-2">Consulta Histórica de Valor Neto</h2>
+        <p class="text-muted">Seleccione una fecha para calcular el valor neto histórico de los bienes.</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros y Fecha de Corte</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-md-4">
+                <label class="form-label">Local:</label>
+                <select name="local_id" id="local_filtro" class="form-select">
+                    <option value="">Todos</option>
+                    {% for local in locales %}
+                        <option value="{{ local.id }}" {% if selected_local_id == local.id|stringformat:"s" %}selected{% endif %}>
+                            {{ local.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Área:</label>
+                <select name="area_id" id="area_filtro" class="form-select" data-selected="{{ selected_area_id }}">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Oficina:</label>
+                <select name="oficina_id" id="oficina_filtro" class="form-select" data-selected="{{ selected_oficina_id }}">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Denominación:</label>
+                <select name="denominacion_id" class="form-select">
+                    <option value="">Todas</option>
+                    {% for denominacion in denominaciones %}
+                        <option value="{{ denominacion.id }}" {% if selected_denominacion_id == denominacion.id|stringformat:"s" %}selected{% endif %}>
+                            {{ denominacion.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Cuenta contable:</label>
+                <select name="cuenta_contable_id" class="form-select">
+                    <option value="">Todas</option>
+                    {% for cuenta in cuentas_contables %}
+                        <option value="{{ cuenta.id }}" {% if selected_cuenta_contable_id == cuenta.id|stringformat:"s" %}selected{% endif %}>
+                            {{ cuenta.codigo }} - {{ cuenta.descripcion }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Fecha:</label>
+                <input type="date" name="fecha_corte" class="form-control" value="{{ fecha_corte|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-8 d-flex align-items-end justify-content-between">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-calculator me-1"></i>Calcular
+                </button>
+                <a href="#" class="btn btn-outline-success">
+                    <i class="fas fa-file-excel me-1"></i>Descargar reporte en Excel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if fecha_corte %}
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Parámetros Aplicados</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <strong>UIT:</strong> {{ valor_uit|floatformat:2 }}
+            </div>
+            <div class="col-md-4">
+                <strong>Divisor:</strong> {{ divisor }}
+            </div>
+            <div class="col-md-4">
+                <strong>Año de Parámetros:</strong>
+                {% if config_year_used %}
+                    {{ config_year_used }}
+                {% else %}
+                    <span class="text-muted">No definido</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Resultados</h5>
+        <span class="badge bg-light text-dark">{{ resultados|length }} bienes</span>
+    </div>
+    <div class="card-body">
+        {% if resultados %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Código Patrimonial</th>
+                        <th>Descripción</th>
+                        <th>Valor Histórico</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resultados %}
+                    <tr>
+                        <td><strong>{{ item.bien.codigo_patrimonial }}</strong></td>
+                        <td>{{ item.bien.descripcion }}</td>
+                        <td>S/ {{ item.valor_historico|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="alert alert-info mb-0">
+                No hay resultados para mostrar.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function cargarAreasPorLocal(localId, selectedAreaId, callback) {
+    if (!localId) {
+        const areaSelect = $('#area_filtro');
+        areaSelect.html('<option value="">Todas</option>');
+        if (callback) callback();
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:obtener_areas_por_local" %}',
+        method: 'GET',
+        data: {'local_id': localId},
+        success: function(response) {
+            const areaSelect = $('#area_filtro');
+            areaSelect.html('<option value="">Todas</option>');
+            if (response.areas && response.areas.length > 0) {
+                response.areas.forEach(function(area) {
+                    areaSelect.append(`<option value="${area.id}">${area.nombre}${area.siglas ? ' (' + area.siglas + ')' : ''}</option>`);
+                });
+            }
+            if (selectedAreaId) {
+                areaSelect.val(selectedAreaId);
+            }
+            if (callback) callback();
+        },
+        error: function() {
+            $('#area_filtro').html('<option value="">Error al cargar</option>');
+            if (callback) callback();
+        }
+    });
+}
+
+function cargarOficinasPorArea(areaId, selectedOficinaId) {
+    if (!areaId) {
+        $('#oficina_filtro').html('<option value="">Todas</option>');
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:obtener_oficinas_por_area" %}',
+        method: 'GET',
+        data: {'area_id': areaId},
+        success: function(response) {
+            const oficinaSelect = $('#oficina_filtro');
+            oficinaSelect.html('<option value="">Todas</option>');
+            if (response.oficinas && response.oficinas.length > 0) {
+                response.oficinas.forEach(function(oficina) {
+                    oficinaSelect.append(`<option value="${oficina.id}">${oficina.nombre}</option>`);
+                });
+            }
+            if (selectedOficinaId) {
+                oficinaSelect.val(selectedOficinaId);
+            }
+        },
+        error: function() {
+            $('#oficina_filtro').html('<option value="">Error al cargar</option>');
+        }
+    });
+}
+
+$(document).ready(function() {
+    const selectedAreaId = $('#area_filtro').data('selected');
+    const selectedOficinaId = $('#oficina_filtro').data('selected');
+    const localId = $('#local_filtro').val();
+
+    if (localId) {
+        cargarAreasPorLocal(localId, selectedAreaId, function() {
+            const areaId = $('#area_filtro').val();
+            if (areaId) {
+                cargarOficinasPorArea(areaId, selectedOficinaId);
+            } else {
+                $('#oficina_filtro').html('<option value="">Todas</option>');
+            }
+        });
+    }
+
+    $('#local_filtro').on('change', function() {
+        const newLocalId = $(this).val();
+        cargarAreasPorLocal(newLocalId, '', function() {
+            $('#oficina_filtro').html('<option value="">Todas</option>');
+        });
+    });
+
+    $('#area_filtro').on('change', function() {
+        const newAreaId = $(this).val();
+        cargarOficinasPorArea(newAreaId, '');
+    });
+});
+</script>
+{% endblock %}

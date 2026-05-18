@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Detalle de Baja - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Detalle de Baja de Bien{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <a href="{% url 'inventario:baja_bienes_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
+        </a>
+        <a href="{% url 'inventario:ficha_baja' baja.pk %}" class="btn btn-danger ms-2" target="_blank">
+            <i class="fas fa-print me-2"></i>Imprimir Ficha de Baja
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-box me-2"></i>Datos del Bien</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Código Patrimonial:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.codigo_patrimonial }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Denominación:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.denominacion.nombre|default:baja.bien.descripcion }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Grupo Genérico:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.grupo_generico }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Clase:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.clase }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Valor de Adquisición:</strong></label>
+                        <p class="form-control-plaintext">S/ {{ baja.bien.valor_adquisicion|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Valor Neto:</strong></label>
+                        <p class="form-control-plaintext">S/ {{ baja.bien.valor_neto|floatformat:2 }}</p>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Tasa de Depreciación:</strong></label>
+                        <p class="form-control-plaintext">
+                            {% if baja.bien.tasa_depreciacion is not None %}
+                                {{ baja.bien.tasa_depreciacion|floatformat:2 }}%
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Vida Útil (meses):</strong></label>
+                        <p class="form-control-plaintext">
+                            {% if baja.bien.vida_util_meses is not None %}
+                                {{ baja.bien.vida_util_meses }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Fecha PECOSA / Salida:</strong></label>
+                        <p class="form-control-plaintext">
+                            {% if baja.bien.fecha_pecosa %}
+                                {{ baja.bien.fecha_pecosa|date:'d/m/Y' }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Local:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.local.nombre }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Área:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.area.nombre|default:'N/A' }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Oficina:</strong></label>
+                        <p class="form-control-plaintext">{{ baja.bien.oficina.nombre|default:'N/A' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>ACTO DE BAJA</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Resolución de Baja:</strong></label>
+                    <p class="form-control-plaintext">{{ baja.resolucion_baja }}</p>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Fecha Resolución:</strong></label>
+                    <p class="form-control-plaintext">{{ baja.fecha_resolucion|date:'d/m/Y' }}</p>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Causal de Baja:</strong></label>
+                    <p><span class="badge bg-danger">{{ baja.get_causal_baja_display }}</span></p>
+                </div>
+                
+                {% if baja.documento_sbn %}
+                <div class="mb-3">
+                    <label class="form-label"><strong>Doc. SBN N°:</strong></label>
+                    <p class="form-control-plaintext">{{ baja.documento_sbn }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Fecha de Registro:</strong></label>
+                    <p class="form-control-plaintext">{{ baja.fecha_registro|date:'d/m/Y H:i' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

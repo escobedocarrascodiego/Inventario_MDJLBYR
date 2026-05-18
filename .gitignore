@@ -1,0 +1,101 @@
+# ============================================================
+# Python / Django
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.installed.cfg
+develop-eggs/
+dist/
+build/
+eggs/
+parts/
+sdist/
+wheels/
+*.manifest
+*.spec
+
+# ============================================================
+# Entornos virtuales
+# ============================================================
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# ============================================================
+# Django
+# ============================================================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+/static_collected/
+
+# Migraciones generadas (se mantienen las iniciales pero ignoramos cachés)
+# **/migrations/__pycache__/
+
+# ============================================================
+# Variables de entorno / Secretos
+# ============================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+
+# ============================================================
+# IDE / Editores
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================
+# Sistema operativo
+# ============================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================================
+# Coverage / Tests
+# ============================================================
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============================================================
+# Jupyter Notebooks
+# ============================================================
+.ipynb_checkpoints
+
+# ============================================================
+# Otros
+# ============================================================
+*.bak
+*.tmp
+*.orig

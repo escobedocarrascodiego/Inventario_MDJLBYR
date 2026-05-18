@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Lista de Bienes - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Bienes Patrimoniales{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Lista de Bienes</h5>
+        <a href="{% url 'inventario:bien_create' %}" class="btn btn-light btn-sm">
+            <i class="fas fa-plus me-1"></i>Nuevo Bien
+        </a>
+    </div>
+    <div class="card-body">
+        <!-- Barra de búsqueda -->
+        <form method="get" class="mb-3" id="bienSearchForm">
+            <div class="row">
+                <div class="col-md-10">
+                    <input type="text" name="search" id="searchBienes" class="form-control" 
+                           placeholder="Buscar por descripción, código patrimonial, marca, modelo, placa..." 
+                           value="{{ search }}">
+                </div>
+                <div class="col-md-2 d-grid gap-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Buscar
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#modalBusquedaAvanzada">
+                        <i class="fas fa-filter me-1"></i>Búsqueda avanzada
+                    </button>
+                </div>
+            </div>
+        </form>
+        
+        <!-- Tabla de bienes -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover data-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Cód. Patrimonial</th>
+                        <th>Descripción</th>
+                        <th>Marca/Modelo</th>
+                        <th>Estado</th>
+                        <th>Valor Neto</th>
+                        <th>Deprec. (%)</th>
+                        <th>Vida Útil</th>
+                        <th>PECOSA</th>
+                        <th>Asignado a</th>
+                        <th>Oficina</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Búsqueda Avanzada -->
+<div class="modal fade" id="modalBusquedaAvanzada" tabindex="-1" aria-labelledby="modalBusquedaAvanzadaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalBusquedaAvanzadaLabel"><i class="fas fa-filter me-2"></i>Búsqueda avanzada</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Código</label>
+            <input type="text" id="adv_codigo" class="form-control" placeholder="Código patrimonial">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Denominación</label>
+            <input type="text" id="adv_denominacion" class="form-control" placeholder="Denominación / descripción">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Ubicación física</label>
+            <input type="text" id="adv_ubicacion" class="form-control" placeholder="Piso, oficina, local...">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Personal asignado</label>
+            <select id="adv_personal" class="form-select">
+              <option value="">Seleccione...</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Cuenta contable</label>
+            <select id="adv_cuenta" class="form-select">
+              <option value="">Seleccione...</option>
+              {% for cuenta in cuentas_contables %}
+              <option value="{{ cuenta.id }}">{{ cuenta.codigo }} - {{ cuenta.descripcion }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Condición</label>
+            <select id="adv_estado" class="form-select">
+              <option value="">Seleccione...</option>
+              {% for key, label in estado_choices %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Resolución de Alta</label>
+            <input type="text" id="adv_resolucion" class="form-control" placeholder="Resolución de alta">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha inicial</label>
+            <input type="date" id="adv_fecha_inicio" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha final</label>
+            <input type="date" id="adv_fecha_fin" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Situación del bien</label>
+            <select id="adv_situacion" class="form-select">
+              <option value="">Seleccione...</option>
+              {% for key, label in situacion_choices %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnLimpiarAvanzada">Limpiar</button>
+        <button type="button" class="btn btn-primary" id="btnAplicarAvanzada">Aplicar filtros</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        var table = $('.data-table');
+        if (!table.length) {
+            return;
+        }
+        var filtrosAvanzados = {
+            codigo: '',
+            denominacion: '',
+            ubicacion: '',
+            personal_id: '',
+            cuenta_id: '',
+            estado: '',
+            resolucion_alta: '',
+            fecha_inicio: '',
+            fecha_fin: '',
+            situacion: ''
+        };
+
+        const modalAvanzada = $('#modalBusquedaAvanzada');
+
+        $('#adv_personal').select2({
+            placeholder: 'Seleccione...',
+            allowClear: true,
+            width: '100%',
+            dropdownParent: modalAvanzada,
+            minimumInputLength: 2,
+            ajax: {
+                url: '{% url "inventario:buscar_personal" %}',
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    return { q: params.term || '' };
+                },
+                processResults: function(data) {
+                    return { results: data.results || [] };
+                },
+                cache: true
+            }
+        });
+
+        $('#adv_cuenta').select2({
+            placeholder: 'Seleccione...',
+            allowClear: true,
+            width: '100%',
+            dropdownParent: modalAvanzada,
+            matcher: function(params, data) {
+                if ($.trim(params.term) === '') {
+                    return data;
+                }
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+                const term = params.term.toLowerCase();
+                const text = data.text.toLowerCase();
+                if (text.indexOf(term) > -1) {
+                    return data;
+                }
+                return null;
+            }
+        });
+
+        var datatableUrl = new URL('datatable/', window.location.href).toString();
+        var dt = table.DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            },
+            responsive: true,
+            processing: true,
+            serverSide: true,
+            pageLength: 25,
+            order: [[0, 'asc']],
+            columnDefs: [
+                { orderable: false, targets: 10 }
+            ],
+            ajax: {
+                url: datatableUrl,
+                data: function(d) {
+                    d.search.value = $('#searchBienes').val() || '';
+                    d.codigo = filtrosAvanzados.codigo;
+                    d.denominacion = filtrosAvanzados.denominacion;
+                    d.ubicacion_fisica = filtrosAvanzados.ubicacion;
+                    d.personal_id = filtrosAvanzados.personal_id;
+                    d.cuenta_id = filtrosAvanzados.cuenta_id;
+                    d.estado = filtrosAvanzados.estado;
+                    d.resolucion_alta = filtrosAvanzados.resolucion_alta;
+                    d.fecha_inicio = filtrosAvanzados.fecha_inicio;
+                    d.fecha_fin = filtrosAvanzados.fecha_fin;
+                    d.situacion = filtrosAvanzados.situacion;
+                },
+                error: function(xhr) {
+                    const message = (xhr && xhr.responseText) ? xhr.responseText : 'Error al cargar datos.';
+                    console.error('Error DataTables:', message);
+                }
+            },
+            search: { search: '{{ search|escapejs }}' }
+        });
+
+        $('#bienSearchForm').on('submit', function(e) {
+            e.preventDefault();
+            dt.search($('#searchBienes').val() || '').draw();
+        });
+
+        $('#btnAplicarAvanzada').on('click', function() {
+            filtrosAvanzados.codigo = $('#adv_codigo').val().trim();
+            filtrosAvanzados.denominacion = $('#adv_denominacion').val().trim();
+            filtrosAvanzados.ubicacion = $('#adv_ubicacion').val().trim();
+            filtrosAvanzados.personal_id = $('#adv_personal').val() || '';
+            filtrosAvanzados.cuenta_id = $('#adv_cuenta').val() || '';
+            filtrosAvanzados.estado = $('#adv_estado').val() || '';
+            filtrosAvanzados.resolucion_alta = $('#adv_resolucion').val().trim();
+            filtrosAvanzados.fecha_inicio = $('#adv_fecha_inicio').val() || '';
+            filtrosAvanzados.fecha_fin = $('#adv_fecha_fin').val() || '';
+            filtrosAvanzados.situacion = $('#adv_situacion').val() || '';
+            $('#modalBusquedaAvanzada').modal('hide');
+            dt.ajax.reload();
+        });
+
+        $('#btnLimpiarAvanzada').on('click', function() {
+            $('#adv_codigo, #adv_denominacion, #adv_ubicacion, #adv_resolucion').val('');
+            $('#adv_cuenta, #adv_estado, #adv_situacion').val('');
+            $('#adv_fecha_inicio, #adv_fecha_fin').val('');
+            $('#adv_personal').val(null).trigger('change');
+            filtrosAvanzados = {
+                codigo: '',
+                denominacion: '',
+                ubicacion: '',
+                personal_id: '',
+                cuenta_id: '',
+                estado: '',
+                resolucion_alta: '',
+                fecha_inicio: '',
+                fecha_fin: '',
+                situacion: ''
+            };
+            dt.ajax.reload();
+        });
+    });
+</script>
+{% endblock %}
+

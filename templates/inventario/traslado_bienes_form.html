@@ -1,0 +1,987 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Traslado de Bienes - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Traslado de Bienes{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Traslado de Bienes</h2>
+            <div>
+                <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#modalReportesTraslado">
+                    <i class="fas fa-file-pdf me-2"></i>Reportes de Traslado
+                </button>
+                <a href="{% url 'inventario:funciones_index' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-2"></i>Salir
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Ubicación Origen -->
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Ubicación Origen</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Usuario:</strong></label>
+                    <select id="usuario_origen" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Local:</strong></label>
+                    <select id="local_origen" class="form-select">
+                        <option value="">Seleccione...</option>
+                        {% for local in locales %}
+                        <option value="{{ local.id }}">{{ local.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Area:</strong></label>
+                    <select id="area_origen" class="form-select">
+                        <option value="">Seleccione...</option>
+                        {% for area in areas %}
+                        <option value="{{ area.id }}">{{ area.nombre }}{% if area.siglas %} ({{ area.siglas }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Oficina:</strong></label>
+                    <select id="oficina_origen" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Ubicación física:</strong></label>
+                    <select id="ubicacion_origen" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                
+                <hr>
+                
+                <h6 class="mb-2">Bienes Disponibles:</h6>
+                <div class="mb-2">
+                    <input type="text" id="searchBienesOrigen" class="form-control form-control-sm"
+                           placeholder="Buscar por código o descripción...">
+                </div>
+                <div class="border rounded p-2" style="height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+                    <table class="table table-sm table-hover mb-0" id="tablaBienesOrigen">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th width="30">
+                                    <input type="checkbox" id="selectAllOrigen" title="Seleccionar todos">
+                                </th>
+                                <th>CODIGO</th>
+                                <th>DESCRIPCION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyBienesOrigen">
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    <small>Seleccione un usuario para cargar los bienes</small>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Botones Centrales -->
+    <div class="col-md-2">
+        <div class="d-flex flex-column align-items-center justify-content-center h-100" style="min-height: 500px;">
+            <button type="button" class="btn btn-outline-primary mb-3 w-100" id="btnNuevo" title="Nuevo">
+                <i class="fas fa-plus me-2"></i>Nuevo
+            </button>
+            
+            <button type="button" class="btn btn-success mb-3 w-100" id="btnTrasladar" disabled title="Trasladar">
+                <i class="fas fa-exchange-alt me-2"></i>Trasladar
+            </button>
+            
+            <div class="d-flex flex-column gap-2 mb-3">
+                <button type="button" class="btn btn-outline-secondary" id="btnMoverDerecha" title="Mover seleccionado a destino">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btnMoverIzquierda" title="Mover seleccionado a origen">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btnMoverTodoDerecha" title="Mover todos a destino">
+                    <i class="fas fa-angle-double-right"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btnMoverTodoIzquierda" title="Mover todos a origen">
+                    <i class="fas fa-angle-double-left"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ubicación Destino -->
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Ubicación Destino</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Usuario:</strong></label>
+                    <select id="usuario_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Local:</strong></label>
+                    <select id="local_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                        {% for local in locales %}
+                        <option value="{{ local.id }}">{{ local.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>&Aacute;rea:</strong></label>
+                    <select id="area_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Oficina:</strong></label>
+                    <select id="oficina_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Ubicación física:</strong></label>
+                    <select id="ubicacion_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                
+                <hr>
+                
+                <h6 class="mb-2">Bienes a Trasladar:</h6>
+                <div class="border rounded p-2" style="height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+                    <table class="table table-sm table-hover mb-0" id="tablaBienesDestino">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th width="30">
+                                    <input type="checkbox" id="selectAllDestino" title="Seleccionar todos">
+                                </th>
+                                <th>CODIGO</th>
+                                <th>DESCRIPCION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyBienesDestino">
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    <small>Los bienes seleccionados aparecerán aquí</small>
+                                </td>
+                                <td style="display: none;"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Reportes de Traslado -->
+<div class="modal fade" id="modalReportesTraslado" tabindex="-1" aria-labelledby="modalReportesTrasladoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalReportesTrasladoLabel">
+                    <i class="fas fa-file-pdf me-2"></i>Reportes de Traslado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="fechaDesde" class="form-label"><strong>Fecha Desde:</strong></label>
+                        <input type="date" class="form-control" id="fechaDesde">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="fechaHasta" class="form-label"><strong>Fecha Hasta:</strong></label>
+                        <input type="date" class="form-control" id="fechaHasta">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary w-100" id="btnBuscarTraslados">
+                            <i class="fas fa-search me-2"></i>Buscar Traslados
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="mensajeResultados" class="alert alert-info d-none" role="alert"></div>
+                
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-striped table-hover" id="tablaTraslados">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Usuario Destino</th>
+                                <th>Local Destino</th>
+                                <th>Área Destino</th>
+                                <th>Oficina Destino</th>
+                                <th>Cantidad Bienes</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyTraslados">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">
+                                    <small>Seleccione un rango de fechas y haga clic en "Buscar Traslados"</small>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<style>
+    .select2-container .select2-selection--single {
+        height: calc(2.375rem + 2px);
+        padding: 0.375rem 0.75rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5;
+        padding-left: 0;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(2.375rem + 2px);
+        right: 0.5rem;
+    }
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+let bienesOrigen = [];
+let bienesDestino = [];
+let filtroBienesOrigen = '';
+
+$(document).ready(function() {
+    const personalAjaxConfig = {
+        url: '{% url "inventario:buscar_personal" %}',
+        dataType: 'json',
+        delay: 250,
+        data: function(params) {
+            return {
+                q: params.term || ''
+            };
+        },
+        processResults: function(data) {
+            return {
+                results: data.results || []
+            };
+        },
+        cache: true
+    };
+
+    $('#usuario_origen').select2({
+        placeholder: 'Seleccione...',
+        allowClear: true,
+        width: '100%',
+        minimumInputLength: 2,
+        ajax: personalAjaxConfig
+    });
+
+    $('#usuario_destino').select2({
+        placeholder: 'Seleccione...',
+        allowClear: true,
+        width: '100%',
+        minimumInputLength: 2,
+        ajax: personalAjaxConfig
+    });
+
+    // Cargar oficinas cuando se selecciona un área (origen) - manualmente
+    $('#area_origen').on('change', function() {
+        const areaId = $(this).val();
+        if (areaId) {
+            cargarOficinasPorArea(areaId, 'origen', function() {
+                cargarUbicacionesPorAreaOficina(areaId, $('#oficina_origen').val(), 'origen');
+            });
+        } else {
+            $('#oficina_origen').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_origen').html('<option value="">Seleccione...</option>');
+        }
+    });
+
+    $('#oficina_origen').on('change', function() {
+        const areaId = $('#area_origen').val();
+        const oficinaId = $(this).val();
+        cargarUbicacionesPorAreaOficina(areaId, oficinaId, 'origen');
+    });
+    
+    // Auto-completar ubicación cuando se selecciona usuario (origen)
+    $('#usuario_origen').on('change', function() {
+        const usuarioId = $(this).val();
+        if (usuarioId) {
+            obtenerUbicacionUsuario(usuarioId, 'origen');
+            // Cargar bienes del usuario después de un pequeño delay
+            setTimeout(() => {
+                cargarBienesOrigen();
+            }, 800);
+        } else {
+            // Limpiar campos si no hay usuario
+            $('#local_origen').val('');
+            $('#area_origen').val('');
+            $('#oficina_origen').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_origen').html('<option value="">Seleccione...</option>');
+            bienesOrigen = [];
+            actualizarTablaOrigen();
+        }
+    });
+    
+    // Auto-completar ubicación cuando se selecciona usuario (destino)
+    $('#usuario_destino').on('change', function() {
+        const usuarioId = $(this).val();
+        if (usuarioId) {
+            obtenerUbicacionUsuario(usuarioId, 'destino');
+        } else {
+            $('#local_destino').val('');
+            $('#area_destino').html('<option value="">Seleccione...</option>');
+            $('#oficina_destino').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+        }
+        verificarBotonTrasladar();
+    });
+
+    // Cascada de selects en destino: local -> areas
+    $('#local_destino').on('change', function() {
+        const localId = $(this).val();
+        if (localId) {
+            $.ajax({
+                url: '{% url "inventario:obtener_areas_por_local" %}',
+                data: { local_id: localId },
+                success: function(r) {
+                    $('#area_destino').html('<option value="">Seleccione...</option>');
+                    (r.areas || []).forEach(function(a) {
+                        $('#area_destino').append('<option value="'+a.id+'">'+a.nombre+(a.siglas?' ('+a.siglas+')':'')+'</option>');
+                    });
+                    $('#oficina_destino').html('<option value="">Seleccione...</option>');
+                    $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+                }
+            });
+        } else {
+            $('#area_destino').html('<option value="">Seleccione...</option>');
+            $('#oficina_destino').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+        }
+    });
+
+    // Cascada destino: area -> oficinas + ubicaciones
+    $('#area_destino').on('change', function() {
+        const areaId = $(this).val();
+        if (areaId) {
+            cargarOficinasPorArea(areaId, 'destino', function() {
+                cargarUbicacionesPorAreaOficina(areaId, $('#oficina_destino').val(), 'destino');
+            });
+        } else {
+            $('#oficina_destino').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+        }
+    });
+
+    // Cascada destino: oficina -> ubicaciones
+    $('#oficina_destino').on('change', function() {
+        const areaId = $('#area_destino').val();
+        const oficinaId = $(this).val();
+        cargarUbicacionesPorAreaOficina(areaId, oficinaId, 'destino');
+    });
+
+    // Recargar bienes cuando cambia la ubicación origen
+    $('#local_origen, #area_origen, #oficina_origen, #ubicacion_origen').on('change', function() {
+        if ($('#usuario_origen').val()) {
+            cargarBienesOrigen();
+        }
+    });
+
+    // Buscador de bienes disponibles (origen)
+    $('#searchBienesOrigen').on('input', function() {
+        filtroBienesOrigen = ($(this).val() || '').trim().toLowerCase();
+        actualizarTablaOrigen();
+    });
+    
+    // Botones de movimiento
+    $('#btnMoverDerecha').on('click', function() {
+        moverBienes('origen', 'destino');
+    });
+    
+    $('#btnMoverIzquierda').on('click', function() {
+        moverBienes('destino', 'origen');
+    });
+    
+    $('#btnMoverTodoDerecha').on('click', function() {
+        moverTodosBienes('origen', 'destino');
+    });
+    
+    $('#btnMoverTodoIzquierda').on('click', function() {
+        moverTodosBienes('destino', 'origen');
+    });
+    
+    // Botón Nuevo
+    $('#btnNuevo').on('click', function() {
+        limpiarFormulario();
+    });
+    
+    // Botón Trasladar
+    $('#btnTrasladar').on('click', function() {
+        ejecutarTraslado();
+    });
+    
+    // Seleccionar todos
+    $('#selectAllOrigen').on('change', function() {
+        $('#tbodyBienesOrigen input[type="checkbox"]').prop('checked', $(this).prop('checked'));
+    });
+    
+    $('#selectAllDestino').on('change', function() {
+        $('#tbodyBienesDestino input[type="checkbox"]').prop('checked', $(this).prop('checked'));
+    });
+
+    // Precarga de bien desde parámetro URL
+    const preloadData = {{ preload_json|safe }};
+    if (preloadData && preloadData.bien_id) {
+        const uid = preloadData.usuario_id;
+        if (uid) {
+            const displayText = preloadData.usuario_nombre;
+            const newOption = new Option(displayText, uid, true, true);
+            $('#usuario_origen').append(newOption).trigger('change');
+
+            obtenerUbicacionUsuario(uid, 'origen');
+            setTimeout(function() {
+                cargarBienesOrigen();
+            }, 1200);
+        }
+    }
+});
+
+function cargarOficinasPorArea(areaId, tipo, callback) {
+    if (!areaId) {
+        const select = tipo === 'origen' ? $('#oficina_origen') : $('#oficina_destino');
+        select.html('<option value="">Seleccione...</option>');
+        if (callback) callback();
+        return;
+    }
+    
+    $.ajax({
+        url: '{% url "inventario:obtener_oficinas_por_area" %}',
+        method: 'GET',
+        data: {'area_id': areaId},
+        success: function(response) {
+            const select = tipo === 'origen' ? $('#oficina_origen') : $('#oficina_destino');
+            select.html('<option value="">Seleccione...</option>');
+            
+            if (response.oficinas && response.oficinas.length > 0) {
+                response.oficinas.forEach(function(oficina) {
+                    select.append(`<option value="${oficina.id}">${oficina.nombre}</option>`);
+                });
+            }
+            if (callback) callback();
+        },
+        error: function() {
+            const select = tipo === 'origen' ? $('#oficina_origen') : $('#oficina_destino');
+            select.html('<option value="">Error al cargar</option>');
+            if (callback) callback();
+        }
+    });
+}
+
+function cargarUbicacionesPorAreaOficina(areaId, oficinaId, tipo, callback) {
+    const select = tipo === 'origen' ? $('#ubicacion_origen') : $('#ubicacion_destino');
+    if (!areaId && !oficinaId) {
+        select.html('<option value="">Seleccione...</option>');
+        if (callback) callback();
+        return;
+    }
+    $.ajax({
+        url: '{% url "inventario:obtener_ubicaciones_fisicas" %}',
+        method: 'GET',
+        data: {
+            area_id: areaId || '',
+            oficina_id: oficinaId || ''
+        },
+        success: function(response) {
+            select.html('<option value="">Seleccione...</option>');
+            if (response.ubicaciones && response.ubicaciones.length > 0) {
+                response.ubicaciones.forEach(function(ubicacion) {
+                    select.append(`<option value="${ubicacion.id}">${ubicacion.nombre}</option>`);
+                });
+            }
+            if (callback) callback();
+        },
+        error: function() {
+            select.html('<option value="">Error al cargar</option>');
+            if (callback) callback();
+        }
+    });
+}
+
+function cargarBienesOrigen() {
+    const usuarioId = $('#usuario_origen').val();
+    const localId = $('#local_origen').val();
+    const areaId = $('#area_origen').val();
+    const oficinaId = $('#oficina_origen').val();
+    const ubicacionId = $('#ubicacion_origen').val();
+    
+    if (!usuarioId) {
+        bienesOrigen = [];
+        filtroBienesOrigen = '';
+        $('#searchBienesOrigen').val('');
+        actualizarTablaOrigen();
+        return;
+    }
+    
+    $.ajax({
+        url: '{% url "inventario:obtener_bienes_por_usuario_ubicacion" %}',
+        method: 'GET',
+        data: {
+            'usuario_id': usuarioId,
+            'local_id': localId || '',
+            'area_id': areaId || '',
+            'oficina_id': oficinaId || '',
+            'ubicacion_id': ubicacionId || ''
+        },
+        success: function(response) {
+            if (response.bienes) {
+                bienesOrigen = response.bienes.filter(b => 
+                    !bienesDestino.some(bd => bd.id === b.id)
+                );
+                actualizarTablaOrigen();
+            }
+        },
+        error: function() {
+            alert('Error al cargar los bienes. Intente nuevamente.');
+        }
+    });
+}
+
+function obtenerUbicacionUsuario(usuarioId, tipo) {
+    const url = '{% url "inventario:obtener_ubicacion_usuario" 999 %}'.replace('999', usuarioId);
+    $.ajax({
+        url: url,
+        method: 'GET',
+        success: function(response) {
+            if (tipo === 'origen') {
+                // Auto-completar selects de origen
+                if (response.local_id) {
+                    $('#local_origen').val(response.local_id);
+                }
+                if (response.area_id) {
+                    $('#area_origen').val(response.area_id);
+                    // Cargar oficinas del área
+                    cargarOficinasPorArea(response.area_id, 'origen', function() {
+                        if (response.oficina_id) {
+                            $('#oficina_origen').val(response.oficina_id);
+                        } else {
+                            $('#oficina_origen').val('');
+                        }
+                        cargarUbicacionesPorAreaOficina(response.area_id, response.oficina_id, 'origen');
+                    });
+                } else {
+                    $('#area_origen').val('');
+                    $('#oficina_origen').html('<option value="">Seleccione...</option>');
+                    $('#ubicacion_origen').html('<option value="">Seleccione...</option>');
+                }
+            } else {
+                // Auto-completar selects de destino
+                if (response.local_id) {
+                    $('#local_destino').val(response.local_id);
+                    // Cargar áreas del local seleccionado
+                    $.ajax({
+                        url: '{% url "inventario:obtener_areas_por_local" %}',
+                        data: { local_id: response.local_id },
+                        success: function(r) {
+                            $('#area_destino').html('<option value="">Seleccione...</option>');
+                            (r.areas || []).forEach(function(a) {
+                                $('#area_destino').append('<option value="'+a.id+'">'+a.nombre+(a.siglas?' ('+a.siglas+')':'')+'</option>');
+                            });
+                            if (response.area_id) {
+                                $('#area_destino').val(response.area_id);
+                                cargarOficinasPorArea(response.area_id, 'destino', function() {
+                                    if (response.oficina_id) {
+                                        $('#oficina_destino').val(response.oficina_id);
+                                    }
+                                    cargarUbicacionesPorAreaOficina(response.area_id, response.oficina_id, 'destino');
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    $('#local_destino').val('');
+                    $('#area_destino').html('<option value="">Seleccione...</option>');
+                    $('#oficina_destino').html('<option value="">Seleccione...</option>');
+                    $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+                }
+            }
+        },
+        error: function() {
+            if (tipo === 'destino') {
+                alert('Error al obtener la ubicación del usuario.');
+            } else {
+                console.error('Error al obtener la ubicación del usuario origen.');
+            }
+        }
+    });
+}
+
+function actualizarTablaOrigen() {
+    const tbody = $('#tbodyBienesOrigen');
+    tbody.empty();
+    
+    if (bienesOrigen.length === 0) {
+        tbody.append('<tr><td colspan="3" class="text-center text-muted"><small>No hay bienes disponibles</small></td></tr>');
+        return;
+    }
+    
+    const bienesFiltrados = bienesOrigen.filter(function(bien) {
+        if (!filtroBienesOrigen) return true;
+        const codigo = (bien.codigo_patrimonial || '').toLowerCase();
+        const descripcion = (bien.descripcion || '').toLowerCase();
+        return codigo.includes(filtroBienesOrigen) || descripcion.includes(filtroBienesOrigen);
+    });
+
+    if (bienesFiltrados.length === 0) {
+        tbody.append('<tr><td colspan="3" class="text-center text-muted"><small>No hay coincidencias</small></td></tr>');
+        return;
+    }
+
+    bienesFiltrados.forEach(function(bien) {
+        const row = `
+            <tr>
+                <td>
+                    <input type="checkbox" class="checkbox-bien-origen" value="${bien.id}">
+                </td>
+                <td><small>${bien.codigo_patrimonial}</small></td>
+                <td><small>${bien.descripcion}</small></td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+function actualizarTablaDestino() {
+    const tbody = $('#tbodyBienesDestino');
+    tbody.empty();
+    
+    if (bienesDestino.length === 0) {
+        tbody.append('<tr><td colspan="3" class="text-center text-muted"><small>No hay bienes seleccionados</small></td></tr>');
+        $('#btnTrasladar').prop('disabled', true);
+        return;
+    }
+    
+    bienesDestino.forEach(function(bien) {
+        const row = `
+            <tr>
+                <td>
+                    <input type="checkbox" class="checkbox-bien-destino" value="${bien.id}">
+                </td>
+                <td><small>${bien.codigo_patrimonial}</small></td>
+                <td><small>${bien.descripcion}</small></td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+    
+    verificarBotonTrasladar();
+}
+
+function moverBienes(desde, hacia) {
+    const checkboxes = desde === 'origen' 
+        ? $('#tbodyBienesOrigen .checkbox-bien-origen:checked')
+        : $('#tbodyBienesDestino .checkbox-bien-destino:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('Seleccione al menos un bien para mover.');
+        return;
+    }
+    
+    const bienesAMover = [];
+    checkboxes.each(function() {
+        const bienId = parseInt($(this).val());
+        const bien = desde === 'origen' 
+            ? bienesOrigen.find(b => b.id === bienId)
+            : bienesDestino.find(b => b.id === bienId);
+        if (bien) {
+            bienesAMover.push(bien);
+        }
+    });
+    
+    if (desde === 'origen') {
+        bienesDestino = bienesDestino.concat(bienesAMover);
+        bienesOrigen = bienesOrigen.filter(b => !bienesAMover.some(bm => bm.id === b.id));
+    } else {
+        bienesOrigen = bienesOrigen.concat(bienesAMover);
+        bienesDestino = bienesDestino.filter(b => !bienesAMover.some(bm => bm.id === b.id));
+    }
+    
+    actualizarTablaOrigen();
+    actualizarTablaDestino();
+}
+
+function moverTodosBienes(desde, hacia) {
+    if (desde === 'origen' && bienesOrigen.length === 0) {
+        alert('No hay bienes para mover.');
+        return;
+    }
+    if (desde === 'destino' && bienesDestino.length === 0) {
+        alert('No hay bienes para mover.');
+        return;
+    }
+    
+    if (desde === 'origen') {
+        bienesDestino = bienesDestino.concat(bienesOrigen);
+        bienesOrigen = [];
+    } else {
+        bienesOrigen = bienesOrigen.concat(bienesDestino);
+        bienesDestino = [];
+    }
+    
+    actualizarTablaOrigen();
+    actualizarTablaDestino();
+}
+
+function verificarBotonTrasladar() {
+    const tieneBienes = bienesDestino.length > 0;
+    const tieneUsuarioOrigen = $('#usuario_origen').val() !== '';
+    const tieneUsuarioDestino = $('#usuario_destino').val() !== '';
+    
+    $('#btnTrasladar').prop('disabled', !(tieneBienes && tieneUsuarioOrigen && tieneUsuarioDestino));
+}
+
+function ejecutarTraslado() {
+    if (bienesDestino.length === 0) {
+        alert('Debe seleccionar al menos un bien para trasladar.');
+        return;
+    }
+    
+    const usuarioOrigenId = $('#usuario_origen').val();
+    const usuarioDestinoId = $('#usuario_destino').val();
+    
+    if (!usuarioOrigenId || !usuarioDestinoId) {
+        alert('Debe seleccionar usuario origen y destino.');
+        return;
+    }
+    
+    if (!confirm(`¿Está seguro de trasladar ${bienesDestino.length} bien(es)?`)) {
+        return;
+    }
+    
+    const bienesIds = bienesDestino.map(b => b.id);
+    
+    $.ajax({
+        url: '{% url "inventario:ejecutar_traslado" %}',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        contentType: 'application/json',
+        data: JSON.stringify({
+            'bienes_ids': bienesIds,
+            'usuario_origen_id': usuarioOrigenId,
+            'local_origen_id': $('#local_origen').val() || '',
+            'area_origen_id': $('#area_origen').val() || '',
+            'oficina_origen_id': $('#oficina_origen').val() || '',
+            'ubicacion_origen_id': $('#ubicacion_origen').val() || '',
+            'usuario_destino_id': usuarioDestinoId,
+            'local_destino_id': $('#local_destino').val() || '',
+            'area_destino_id': $('#area_destino').val() || '',
+            'oficina_destino_id': $('#oficina_destino').val() || '',
+            'ubicacion_destino_id': $('#ubicacion_destino').val() || '',
+            'observaciones': ''
+        }),
+        success: function(response) {
+            if (response.success) {
+                // Mostrar mensaje de éxito con opción de imprimir reporte
+                if (confirm(response.message + '\n\n¿Desea imprimir el reporte de asignación?')) {
+                    // Abrir el reporte del primer traslado (todos los traslados del mismo lote tienen la misma fecha/usuario)
+                    if (response.traslados_ids && response.traslados_ids.length > 0) {
+                        const reporteUrl = '{% url "inventario:reporte_asignacion_traslado" 0 %}'.replace('0', response.traslados_ids[0]);
+                        window.open(reporteUrl, '_blank');
+                    }
+                }
+                limpiarFormulario();
+            } else {
+                alert('Error: ' + (response.error || 'No se pudo completar el traslado.'));
+            }
+        },
+        error: function() {
+            alert('Error al ejecutar el traslado. Intente nuevamente.');
+        }
+    });
+}
+
+function limpiarFormulario() {
+    $('#local_origen, #area_origen, #oficina_origen, #usuario_origen, #usuario_destino').val('');
+    $('#usuario_origen, #usuario_destino').trigger('change');
+    $('#area_origen, #oficina_origen').html('<option value="">Seleccione...</option>');
+    $('#ubicacion_origen').html('<option value="">Seleccione...</option>');
+    $('#local_destino').val('');
+    $('#area_destino').html('<option value="">Seleccione...</option>');
+    $('#oficina_destino').html('<option value="">Seleccione...</option>');
+    $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+    $('#searchBienesOrigen').val('');
+    filtroBienesOrigen = '';
+    bienesOrigen = [];
+    bienesDestino = [];
+    actualizarTablaOrigen();
+    actualizarTablaDestino();
+    $('#btnTrasladar').prop('disabled', true);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Funcionalidad del modal de reportes de traslado
+$(document).ready(function() {
+    // Establecer fechas por defecto (últimos 7 días)
+    const hoy = new Date();
+    const hace7Dias = new Date();
+    hace7Dias.setDate(hoy.getDate() - 7);
+    
+    $('#fechaHasta').val(hoy.toISOString().split('T')[0]);
+    $('#fechaDesde').val(hace7Dias.toISOString().split('T')[0]);
+    
+    // Buscar traslados al hacer clic en el botón
+    $('#btnBuscarTraslados').on('click', function() {
+        buscarTraslados();
+    });
+    
+    // Permitir buscar con Enter en los campos de fecha
+    $('#fechaDesde, #fechaHasta').on('keypress', function(e) {
+        if (e.which === 13) {
+            buscarTraslados();
+        }
+    });
+    
+    // Limpiar resultados al cerrar el modal
+    $('#modalReportesTraslado').on('hidden.bs.modal', function() {
+        $('#tbodyTraslados').html('<tr><td colspan="7" class="text-center text-muted"><small>Seleccione un rango de fechas y haga clic en "Buscar Traslados"</small></td></tr>');
+        $('#mensajeResultados').addClass('d-none');
+    });
+});
+
+function buscarTraslados() {
+    const fechaDesde = $('#fechaDesde').val();
+    const fechaHasta = $('#fechaHasta').val();
+    
+    if (!fechaDesde || !fechaHasta) {
+        alert('Por favor seleccione ambas fechas.');
+        return;
+    }
+    
+    if (fechaDesde > fechaHasta) {
+        alert('La fecha "Desde" debe ser anterior o igual a la fecha "Hasta".');
+        return;
+    }
+    
+    $('#btnBuscarTraslados').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Buscando...');
+    
+    $.ajax({
+        url: '{% url "inventario:buscar_traslados_por_fecha" %}',
+        method: 'GET',
+        data: {
+            'fecha_desde': fechaDesde,
+            'fecha_hasta': fechaHasta
+        },
+        success: function(response) {
+            $('#btnBuscarTraslados').prop('disabled', false).html('<i class="fas fa-search me-2"></i>Buscar Traslados');
+            
+            const tbody = $('#tbodyTraslados');
+            tbody.empty();
+            
+            if (response.traslados && response.traslados.length > 0) {
+                $('#mensajeResultados').removeClass('d-none alert-danger').addClass('alert-info')
+                    .html(`Se encontraron <strong>${response.traslados.length}</strong> traslado(s) en el rango de fechas seleccionado.`);
+                
+                response.traslados.forEach(function(traslado) {
+                    const fecha = new Date(traslado.fecha_traslado);
+                    const fechaFormateada = fecha.toLocaleDateString('es-PE', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    const reporteUrl = '{% url "inventario:reporte_asignacion_traslado" 999 %}'.replace('999', traslado.traslado_id);
+                    const row = `
+                        <tr>
+                            <td>${fechaFormateada}</td>
+                            <td>${traslado.usuario_destino_nombre || '-'}</td>
+                            <td>${traslado.local_destino_nombre || '-'}</td>
+                            <td>${traslado.area_destino_nombre || '-'}</td>
+                            <td>${traslado.oficina_destino_nombre || '-'}</td>
+                            <td class="text-center"><span class="badge bg-primary">${traslado.cantidad_bienes}</span></td>
+                            <td>
+                                <a href="${reporteUrl}" 
+                                   class="btn btn-sm btn-outline-primary" 
+                                   target="_blank"
+                                   title="Imprimir Ficha">
+                                    <i class="fas fa-print"></i> Imprimir
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+            } else {
+                $('#mensajeResultados').removeClass('d-none alert-info').addClass('alert-warning')
+                    .html('No se encontraron traslados en el rango de fechas seleccionado.');
+                tbody.append('<tr><td colspan="7" class="text-center text-muted"><small>No hay resultados</small></td></tr>');
+            }
+        },
+        error: function() {
+            $('#btnBuscarTraslados').prop('disabled', false).html('<i class="fas fa-search me-2"></i>Buscar Traslados');
+            alert('Error al buscar los traslados. Intente nuevamente.');
+        }
+    });
+}
+</script>
+{% endblock %}

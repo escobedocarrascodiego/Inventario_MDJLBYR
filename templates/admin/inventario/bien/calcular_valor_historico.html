@@ -1,0 +1,45 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="content">
+    <h1>Calcular Valor Histórico</h1>
+
+    <form method="post" class="mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="ids" value="{{ ids }}">
+        <div class="form-row">
+            {{ form.fecha_corte.label_tag }}
+            {{ form.fecha_corte }}
+        </div>
+        <div class="submit-row">
+            <input type="submit" value="Calcular" class="default">
+            <a href="{% url 'admin:inventario_bien_changelist' %}" class="button">Volver</a>
+        </div>
+    </form>
+
+    {% if resultados %}
+        <h2>Resultados para {{ fecha_corte }}</h2>
+        <table class="adminlist table">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th>Valor Histórico</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resultados %}
+                    <tr>
+                        <td>{{ item.bien.codigo_patrimonial }}</td>
+                        <td>{{ item.bien.descripcion }}</td>
+                        <td>{{ item.valor_historico|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% elif fecha_corte %}
+        <p>No hay bienes seleccionados para calcular.</p>
+    {% endif %}
+</div>
+{% endblock %}

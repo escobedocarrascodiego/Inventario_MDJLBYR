@@ -1,0 +1,777 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    #lista-denominaciones .list-group-item {
+        border: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    #lista-denominaciones .list-group-item:hover {
+        background-color: #0d6efd;
+        color: white;
+    }
+    #lista-denominaciones .list-group-item.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+    /* Ocultar select de usuario (se usa el buscador) */
+    #id_usuario_asignado { display: none !important; }
+    #lista-usuarios .list-group-item {
+        cursor: pointer;
+    }
+    #lista-usuarios .list-group-item:hover {
+        background-color: #0d6efd;
+        color: white;
+    }
+</style>
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-box me-2"></i>Registro de Bienes Activos
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate id="form-bien">
+                    {% csrf_token %}
+                    
+                    <!-- SECCIÓN 1: SELECCIÓN DEL TIPO DE BIEN -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><strong>[Selección del Tipo de Bien]</strong></h6>
+                        <div class="mb-3">
+                            <label for="id_buscar_denominacion" class="form-label">
+                                <strong>ESCRIBA EL NOMBRE DEL BIEN A BUSCAR:</strong>
+                            </label>
+                            <div class="input-group">
+                                {{ form.buscar_denominacion }}
+                                <button type="button" class="btn btn-primary" id="btn-buscar-denominacion" title="Buscar">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="lista-denominaciones" class="border rounded p-2" style="max-height: 200px; overflow-y: auto; display: none; background-color: #f8f9fa;">
+                            <!-- Aquí se mostrarán los resultados -->
+                        </div>
+                    </div>
+                    
+                    <!-- SECCIÓN 2: DATOS DEL BIEN -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><strong>[Datos del Bien]</strong></h6>
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Denominación:</label>
+                                <input type="text" class="form-control" id="id_denominacion_display" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Código Patrimonial:</label>
+                                <input type="text" class="form-control" id="id_codigo_patrimonial_display" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Grupo Genérico:</label>
+                                <input type="text" class="form-control" id="id_grupo_generico_display" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Clase:</label>
+                                <input type="text" class="form-control" id="id_clase_display" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Código Interno:</label>
+                                {{ form.codigo_interno }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Ult. Correlativo:</label>
+                                <input type="text" class="form-control" id="id_correlativo_display" value="0" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Tipo de cuenta:</label>
+                                {{ form.tipo_cuenta }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cuenta contable:</label>
+                                {{ form.cuenta_contable }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Tasa de depreciación (% anual):</label>
+                                {{ form.tasa_depreciacion }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Vida útil (meses):</label>
+                                {{ form.vida_util_meses }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campo oculto para denominación -->
+                    {{ form.denominacion }}
+                    
+                    <!-- SECCIÓN 3: ADQUISICIÓN Y VALORES -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><strong>[Adquisición]</strong></h6>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Forma de Adquisición:</label>
+                                {{ form.forma_adquisicion }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha:</label>
+                                {{ form.fecha_adquisicion }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Orden de Compra / Resolucion de Alta:</label>
+                                {{ form.resolucion_alta }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha de PECOSA / Salida:</label>
+                                {{ form.fecha_pecosa }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Valor de Adquisición:</label>
+                                {{ form.valor_adquisicion }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valor Neto:</label>
+                                {{ form.valor_neto }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Estado del Bien:</label>
+                                {{ form.estado }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Situación:</label>
+                                {{ form.situacion }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SECCIÓN 4: ASIGNACIÓN -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><strong>[Asignación]</strong></h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Usuario:</label>
+                                <div class="position-relative">
+                                    <input type="text" class="form-control" id="id_buscar_usuario" 
+                                           placeholder="Buscar por apellidos (ej: Escobedo)..." autocomplete="off">
+                                    <div id="lista-usuarios" class="list-group position-absolute w-100 border rounded shadow-sm" 
+                                         style="max-height: 220px; overflow-y: auto; z-index: 1000; display: none;"></div>
+                                    {{ form.usuario_asignado }}
+                                </div>
+                                <small class="text-muted">Escriba al menos 2 caracteres para buscar por apellidos</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Local:</label>
+                                {{ form.local }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Área:</label>
+                                {{ form.area }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Oficina:</label>
+                                {{ form.oficina }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Ubicación física:</label>
+                                {{ form.ubicacion_fisica }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SECCIÓN 5: DETALLE TÉCNICO -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><strong>[Detalle Técnico]</strong></h6>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Marca:</label>
+                                {{ form.marca }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Modelo:</label>
+                                {{ form.modelo }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Color:</label>
+                                {{ form.color }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Serie:</label>
+                                {{ form.serie }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Dimensión:</label>
+                                {{ form.dimension }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">N° Motor:</label>
+                                {{ form.numero_motor }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">N° Chasis:</label>
+                                {{ form.numero_chasis }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Placa:</label>
+                                {{ form.placa }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Año:</label>
+                                {{ form.anio_fabricacion }}
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Otros:</label>
+                                {{ form.otros_detalles }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botones de acción -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <div>
+                            <button type="button" class="btn btn-info me-2" id="btn-ingreso-unidad">
+                                <i class="fas fa-cube me-1"></i>Ingreso X Unidad
+                            </button>
+                            <button type="button" class="btn btn-outline-info" id="btn-ingreso-grupo">
+                                <i class="fas fa-cubes me-1"></i>Ingreso X Grupo
+                            </button>
+                        </div>
+                        <div>
+                            <a href="{% url 'inventario:bien_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Grabar
+                            </button>
+                            <a href="{% url 'inventario:bien_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-sign-out-alt me-1"></i>Salir
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let searchTimeout;
+    const buscarInput = $('#id_buscar_denominacion');
+    const listaDiv = $('#lista-denominaciones');
+    const denominacionHidden = $('#id_denominacion');
+    const tasaDepreciacionInput = $('#id_tasa_depreciacion');
+    const vidaUtilMesesInput = $('#id_vida_util_meses');
+    const cuentaContableSelect = $('#id_cuenta_contable');
+    const valorAdquisicionInput = $('#id_valor_adquisicion');
+    const fechaPecosaInput = $('#id_fecha_pecosa');
+    const valorNetoInput = $('#id_valor_neto');
+    let valorNetoTimeout;
+
+    function actualizarValorNeto() {
+        const valorAdquisicion = valorAdquisicionInput.val();
+        if (!valorAdquisicion) {
+            return;
+        }
+        const url = '{% url "inventario:obtener_valor_neto" %}';
+        clearTimeout(valorNetoTimeout);
+        valorNetoTimeout = setTimeout(function() {
+            $.ajax({
+                url: url,
+                method: 'GET',
+                data: {
+                    valor_adquisicion: valorAdquisicion,
+                    fecha_pecosa: fechaPecosaInput.val(),
+                    tasa_depreciacion: tasaDepreciacionInput.val(),
+                    cuenta_contable_id: cuentaContableSelect.val(),
+                    vida_util_meses: vidaUtilMesesInput.val()
+                },
+                success: function(data) {
+                    if (data.valor_neto !== null && data.valor_neto !== undefined) {
+                        valorNetoInput.val(data.valor_neto);
+                    }
+                },
+                error: function() {
+                    console.error('Error al calcular el valor neto');
+                }
+            });
+        }, 200);
+    }
+    
+    // Función para cargar denominación (usada tanto en creación como en edición)
+    function cargarDenominacion(denominacionId, bienCorrelativo, bienCodigoPatrimonial) {
+        const url = '{% url "inventario:obtener_denominacion" 999 %}'.replace('999', denominacionId);
+        $.ajax({
+            url: url,
+            method: 'GET',
+            success: function(data) {
+                // Establecer el campo oculto
+                denominacionHidden.val(data.id);
+                
+                // Auto-completar campos de solo lectura
+                $('#id_denominacion_display').val(data.nombre || '');
+                $('#id_grupo_generico_display').val(data.grupo_generico || '');
+                $('#id_clase_display').val(data.clase || '');
+                
+                // En modo edición usar el código patrimonial y correlativo del bien actual
+                // En modo creación usar el siguiente correlativo calculado
+                if (bienCodigoPatrimonial && bienCodigoPatrimonial !== '') {
+                    $('#id_codigo_patrimonial_display').val(bienCodigoPatrimonial);
+                } else if (data.codigo_patrimonial_completo) {
+                    $('#id_codigo_patrimonial_display').val(data.codigo_patrimonial_completo);
+                }
+                
+                if (bienCorrelativo !== undefined && bienCorrelativo !== null && bienCorrelativo !== 0) {
+                    $('#id_correlativo_display').val(bienCorrelativo);
+                } else if (data.correlativo) {
+                    $('#id_correlativo_display').val(data.correlativo);
+                }
+                
+                // Auto-seleccionar cuenta contable si viene de la denominación
+                if (data.cuenta_contable_id) {
+                    cuentaContableSelect.val(data.cuenta_contable_id);
+                }
+
+                // Completar depreciación/vida útil solo si están vacíos
+                if (tasaDepreciacionInput.val() === '' && data.tasa_depreciacion !== null) {
+                    tasaDepreciacionInput.val(parseFloat(data.tasa_depreciacion).toFixed(2));
+                }
+                if (vidaUtilMesesInput.val() === '' && data.vida_util_meses !== null) {
+                    vidaUtilMesesInput.val(data.vida_util_meses);
+                }
+                actualizarValorNeto();
+                
+                // Actualizar el input de búsqueda
+                buscarInput.val(data.nombre || '');
+            },
+            error: function() {
+                console.error('Error al cargar los datos de la denominación');
+                alert('Error al cargar los datos de la denominación');
+            }
+        });
+    }
+    
+    // Si hay una denominación pre-seleccionada (modo edición), cargar sus datos
+    {% if form.instance.pk and form.instance.denominacion %}
+        const denominacionId = {{ form.instance.denominacion.id }};
+        const bienCorrelativo = {{ form.instance.correlativo|default:0 }};
+        const bienCodigoPatrimonial = '{{ form.instance.codigo_patrimonial|default:"" }}';
+        // Esperar un momento para que el DOM esté completamente listo
+        setTimeout(function() {
+            cargarDenominacion(denominacionId, bienCorrelativo, bienCodigoPatrimonial);
+        }, 200);
+    {% endif %}
+    
+    // Búsqueda en tiempo real mientras se escribe
+    buscarInput.on('input', function() {
+        const query = $(this).val().trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            listaDiv.hide().empty();
+            return;
+        }
+        
+        searchTimeout = setTimeout(function() {
+            buscarDenominaciones(query);
+        }, 300);
+    });
+    
+    // Búsqueda al hacer clic en el botón
+    $('#btn-buscar-denominacion').on('click', function() {
+        const query = buscarInput.val().trim();
+        if (query.length >= 2) {
+            buscarDenominaciones(query);
+        } else {
+            alert('Por favor ingrese al menos 2 caracteres para buscar');
+        }
+    });
+    
+    // Función para buscar denominaciones
+    function buscarDenominaciones(query) {
+        $.ajax({
+            url: '{% url "inventario:buscar_denominaciones" %}',
+            method: 'GET',
+            data: { q: query },
+            success: function(response) {
+                mostrarResultados(response.denominaciones);
+            },
+            error: function() {
+                alert('Error al buscar denominaciones');
+            }
+        });
+    }
+    
+    // Función para mostrar resultados
+    function mostrarResultados(denominaciones) {
+        listaDiv.empty();
+        
+        if (denominaciones.length === 0) {
+            listaDiv.html('<div class="text-muted p-2">No se encontraron resultados</div>').show();
+            return;
+        }
+        
+        denominaciones.forEach(function(den) {
+            const item = $('<div>')
+                .addClass('list-group-item list-group-item-action')
+                .css('cursor', 'pointer')
+                .html('<strong>' + den.nombre + '</strong><br><small class="text-muted">' + 
+                      den.grupo_generico + ' / ' + den.clase + '</small>')
+                .on('click', function() {
+                    seleccionarDenominacion(den.id);
+                })
+                .on('mouseenter', function() {
+                    $(this).addClass('active');
+                })
+                .on('mouseleave', function() {
+                    $(this).removeClass('active');
+                });
+            
+            listaDiv.append(item);
+        });
+        
+        listaDiv.show();
+    }
+    
+    // Función para seleccionar una denominación
+    function seleccionarDenominacion(denominacionId) {
+        const url = '{% url "inventario:obtener_denominacion" 999 %}'.replace('999', denominacionId);
+        $.ajax({
+            url: url,
+            method: 'GET',
+            success: function(data) {
+                // Establecer el campo oculto
+                denominacionHidden.val(data.id);
+                
+                // Auto-completar campos
+                $('#id_denominacion_display').val(data.nombre);
+                $('#id_grupo_generico_display').val(data.grupo_generico);
+                $('#id_clase_display').val(data.clase);
+                $('#id_codigo_patrimonial_display').val(data.codigo_patrimonial_completo);
+                $('#id_correlativo_display').val(data.correlativo);
+                // Auto-seleccionar cuenta contable si viene de la denominación
+                // tipo_cuenta se selecciona manualmente en el formulario
+                if (data.cuenta_contable_id) {
+                    cuentaContableSelect.val(data.cuenta_contable_id);
+                }
+
+                // Completar depreciación/vida útil solo si están vacíos
+                if (tasaDepreciacionInput.val() === '' && data.tasa_depreciacion !== null) {
+                    tasaDepreciacionInput.val(parseFloat(data.tasa_depreciacion).toFixed(2));
+                }
+                if (vidaUtilMesesInput.val() === '' && data.vida_util_meses !== null) {
+                    vidaUtilMesesInput.val(data.vida_util_meses);
+                }
+                actualizarValorNeto();
+                
+                // Actualizar el input de búsqueda
+                buscarInput.val(data.nombre);
+                
+                // Ocultar lista
+                listaDiv.hide();
+            },
+            error: function() {
+                alert('Error al cargar los datos de la denominación');
+            }
+        });
+    }
+    
+    // Ocultar lista al hacer clic fuera
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#id_buscar_denominacion, #btn-buscar-denominacion, #lista-denominaciones').length) {
+            listaDiv.hide();
+        }
+    });
+
+    // Completar depreciación/vida útil al cambiar cuenta contable manualmente
+    cuentaContableSelect.on('change', function() {
+        const cuentaId = $(this).val();
+        if (!cuentaId) {
+            return;
+        }
+        const url = '{% url "inventario:obtener_cuenta_contable" 999 %}'.replace('999', cuentaId);
+        $.ajax({
+            url: url,
+            method: 'GET',
+            success: function(data) {
+                if (tasaDepreciacionInput.val() === '' && data.tasa_depreciacion !== null) {
+                    tasaDepreciacionInput.val(parseFloat(data.tasa_depreciacion).toFixed(2));
+                }
+                if (vidaUtilMesesInput.val() === '' && data.vida_util_meses !== null) {
+                    vidaUtilMesesInput.val(data.vida_util_meses);
+                }
+                actualizarValorNeto();
+            },
+            error: function() {
+                console.error('Error al obtener datos de la cuenta contable');
+            }
+        });
+    });
+
+    // Actualizar valor neto cuando cambian campos clave
+    valorAdquisicionInput.on('input', actualizarValorNeto);
+    fechaPecosaInput.on('change', actualizarValorNeto);
+    tasaDepreciacionInput.on('input', actualizarValorNeto);
+    vidaUtilMesesInput.on('input', actualizarValorNeto);
+    cuentaContableSelect.on('change', actualizarValorNeto);
+
+    // Calcular en carga si ya hay valores
+    setTimeout(function() {
+        if (valorAdquisicionInput.val()) {
+            actualizarValorNeto();
+        }
+    }, 300);
+    
+    // Validar que se haya seleccionado una denominación antes de enviar
+    $('#form-bien').on('submit', function(e) {
+        if (!denominacionHidden.val()) {
+            e.preventDefault();
+            alert('Por favor seleccione una denominación del catálogo');
+            buscarInput.focus();
+            return false;
+        }
+    });
+    
+    // ===== BUSCADOR DE USUARIO (ASIGNACIÓN) =====
+    const buscarUsuarioInput = $('#id_buscar_usuario');
+    const listaUsuariosDiv = $('#lista-usuarios');
+    const usuarioSelect = $('#id_usuario_asignado');
+    let searchUsuarioTimeout;
+    
+    buscarUsuarioInput.on('input', function() {
+        const query = $(this).val().trim();
+        clearTimeout(searchUsuarioTimeout);
+        if (query.length < 2) {
+            listaUsuariosDiv.hide().empty();
+            usuarioSelect.val('');
+            return;
+        }
+        searchUsuarioTimeout = setTimeout(function() {
+            $.ajax({
+                url: '{% url "inventario:buscar_personal" %}',
+                method: 'GET',
+                data: { q: query },
+                success: function(response) {
+                    listaUsuariosDiv.empty();
+                    if (!response.personal || response.personal.length === 0) {
+                        listaUsuariosDiv.html('<div class="list-group-item text-muted">No se encontraron usuarios</div>').show();
+                        return;
+                    }
+                    response.personal.forEach(function(p) {
+                        const item = $('<div>')
+                            .addClass('list-group-item list-group-item-action')
+                            .text(p.display)
+                            .attr('data-id', p.id)
+                            .on('click', function() {
+                                const id = $(this).data('id');
+                                usuarioSelect.val(id);
+                                buscarUsuarioInput.val($(this).text());
+                                listaUsuariosDiv.hide().empty();
+                                usuarioSelect.trigger('change');
+                            });
+                        listaUsuariosDiv.append(item);
+                    });
+                    listaUsuariosDiv.show();
+                },
+                error: function() {
+                    listaUsuariosDiv.html('<div class="list-group-item text-danger">Error al buscar</div>').show();
+                }
+            });
+        }, 300);
+    });
+    
+    buscarUsuarioInput.on('focus', function() {
+        const query = $(this).val().trim();
+        if (query.length >= 2 && listaUsuariosDiv.children().length) {
+            listaUsuariosDiv.show();
+        }
+    });
+    
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#id_buscar_usuario, #lista-usuarios').length) {
+            listaUsuariosDiv.hide();
+        }
+    });
+    
+    // Cargar nombre del usuario seleccionado en modo edición
+    {% if form.instance.pk and form.instance.usuario_asignado %}
+        $(document).ready(function() {
+            const opt = usuarioSelect.find('option:selected');
+            if (opt.length && opt.val()) {
+                buscarUsuarioInput.val(opt.text().trim());
+            }
+        });
+    {% endif %}
+    
+    // ===== CARGAR UBICACIÓN DEL USUARIO AUTOMÁTICAMENTE =====
+    $('#id_usuario_asignado').on('change', function() {
+        const usuarioId = $(this).val();
+        
+        if (usuarioId) {
+            // Obtener la ubicación del usuario
+            const url = '{% url "inventario:obtener_ubicacion_usuario" 999 %}'.replace('999', usuarioId);
+            $.ajax({
+                url: url,
+                method: 'GET',
+                success: function(data) {
+                    if (data.local_id) {
+                        $('#id_local').val(data.local_id);
+                    }
+                    if (data.area_id) {
+                        $('#id_area').val(data.area_id);
+                        cargarOficinasPorArea(data.area_id, function() {
+                            if (data.oficina_id) {
+                                $('#id_oficina').val(data.oficina_id);
+                            } else {
+                                $('#id_oficina').val('');
+                            }
+                            cargarUbicacionesPorAreaOficina(data.area_id, data.oficina_id, null);
+                        });
+                    } else {
+                        $('#id_area').val('');
+                        $('#id_oficina').val('');
+                        $('#id_ubicacion_fisica').val('');
+                    }
+                },
+                error: function() {
+                    console.error('Error al obtener la ubicación del usuario');
+                }
+            });
+        } else {
+            // Si no hay usuario seleccionado, limpiar campos (opcional)
+            // $('#id_local').val('');
+            // $('#id_area').val('');
+            // $('#id_oficina').val('');
+        }
+    });
+    
+    // Función para cargar oficinas por área
+    function cargarOficinasPorArea(areaId, callback) {
+        if (!areaId) {
+            $('#id_oficina').html('<option value="">Seleccione...</option>');
+            $('#id_ubicacion_fisica').html('<option value="">Seleccione...</option>');
+            if (callback) callback();
+            return;
+        }
+        
+        $.ajax({
+            url: '{% url "inventario:obtener_oficinas_por_area" %}',
+            method: 'GET',
+            data: { area_id: areaId },
+            success: function(data) {
+                let options = '<option value="">Seleccione...</option>';
+                data.oficinas.forEach(function(oficina) {
+                    options += '<option value="' + oficina.id + '">' + oficina.nombre + '</option>';
+                });
+                $('#id_oficina').html(options);
+                if (callback) callback();
+            },
+            error: function() {
+                console.error('Error al cargar oficinas');
+                if (callback) callback();
+            }
+        });
+    }
+
+    function cargarUbicacionesPorAreaOficina(areaId, oficinaId, selectedId, callback) {
+        if (!areaId && !oficinaId) {
+            $('#id_ubicacion_fisica').html('<option value="">Seleccione...</option>');
+            if (callback) callback();
+            return;
+        }
+        $.ajax({
+            url: '{% url "inventario:obtener_ubicaciones_fisicas" %}',
+            method: 'GET',
+            data: {
+                area_id: areaId || '',
+                oficina_id: oficinaId || ''
+            },
+            success: function(response) {
+                let options = '<option value="">Seleccione...</option>';
+                (response.ubicaciones || []).forEach(function(ubicacion) {
+                    const selected = String(ubicacion.id) === String(selectedId) ? ' selected' : '';
+                    options += '<option value="' + ubicacion.id + '"' + selected + '>' + ubicacion.nombre + '</option>';
+                });
+                $('#id_ubicacion_fisica').html(options);
+                if (callback) callback();
+            },
+            error: function() {
+                console.error('Error al cargar ubicaciones físicas');
+                if (callback) callback();
+            }
+        });
+    }
+    
+    // Cargar oficinas cuando cambia el área (manualmente)
+    $('#id_area').on('change', function() {
+        const areaId = $(this).val();
+        cargarOficinasPorArea(areaId, function() {
+            cargarUbicacionesPorAreaOficina(areaId, $('#id_oficina').val(), null);
+        });
+    });
+
+    $('#id_oficina').on('change', function() {
+        const areaId = $('#id_area').val();
+        const oficinaId = $(this).val();
+        cargarUbicacionesPorAreaOficina(areaId, oficinaId, null);
+    });
+    
+    // Si hay un usuario pre-seleccionado (modo edición), cargar su ubicación
+    // Pero solo si los campos de local/area/oficina están vacíos
+    {% if form.instance.pk and form.instance.usuario_asignado %}
+        $(document).ready(function() {
+            const usuarioId = {{ form.instance.usuario_asignado.id }};
+            const areaId = $('#id_area').val();
+            const oficinaId = $('#id_oficina').val();
+            const ubicacionId = '{{ form.instance.ubicacion_fisica.id|default:"" }}';
+            
+            // Si no hay local o área seleccionados, cargar desde el usuario
+            if (!areaId) {
+                // Esperar un momento para que los selects estén listos
+                setTimeout(function() {
+                    $('#id_usuario_asignado').val(usuarioId).trigger('change');
+                }, 200);
+            } else {
+                // Si ya hay valores, solo cargar las opciones de áreas y oficinas
+                $('#id_area').val(areaId);
+                cargarOficinasPorArea(areaId, function() {
+                    $('#id_oficina').val(oficinaId);
+                    cargarUbicacionesPorAreaOficina(areaId, oficinaId, ubicacionId);
+                });
+            }
+        });
+    {% endif %}
+});
+</script>
+{% endblock %}

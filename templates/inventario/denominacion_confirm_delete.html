@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Denominación - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Eliminar Denominación{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">¿Está seguro de que desea eliminar la siguiente denominación?</p>
+                
+                <div class="alert alert-info">
+                    <strong>Denominación:</strong> {{ object.nombre }}<br>
+                    <strong>Grupo Genérico:</strong> {{ object.grupo_generico }}<br>
+                    <strong>Clase:</strong> {{ object.clase }}<br>
+                    <strong>Código Patrimonial Base:</strong> {{ object.codigo_patrimonial_base }}
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'inventario:denominacion_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i>Sí, Eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+

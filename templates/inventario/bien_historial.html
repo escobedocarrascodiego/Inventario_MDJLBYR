@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historial de Traslados - {{ bien.codigo_patrimonial }}{% endblock %}
+
+{% block page_title %}Historial de Traslados{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Información del Bien</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Código Patrimonial:</strong> {{ bien.codigo_patrimonial }}</p>
+                <p><strong>Descripción:</strong> {{ bien.descripcion }}</p>
+                <p><strong>Marca/Modelo:</strong> {{ bien.marca|default:"-" }} {{ bien.modelo|default:"" }}</p>
+                <p><strong>Tasa de Depreciación:</strong> 
+                    {% if bien.tasa_depreciacion is not None %}
+                        {{ bien.tasa_depreciacion|floatformat:2 }}%
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Estado:</strong> 
+                    <span class="badge 
+                        {% if bien.estado == 'NUEVO' %}bg-success
+                        {% elif bien.estado == 'BUENO' %}bg-info
+                        {% elif bien.estado == 'REGULAR' %}bg-warning
+                        {% elif bien.estado == 'MALO' %}bg-danger
+                        {% else %}bg-secondary{% endif %}">
+                        {{ bien.get_estado_display }}
+                    </span>
+                </p>
+                <p><strong>Valor Neto:</strong> S/ {{ bien.valor_neto|floatformat:2 }}</p>
+                <p><strong>Vida Útil (meses):</strong> 
+                    {% if bien.vida_util_meses is not None %}
+                        {{ bien.vida_util_meses }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </p>
+                <p><strong>Fecha PECOSA / Salida:</strong> 
+                    {% if bien.fecha_pecosa %}
+                        {{ bien.fecha_pecosa|date:'d/m/Y' }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </p>
+                <p><strong>Usuario Actual:</strong> 
+                    {% if bien.usuario_asignado %}
+                        {{ bien.usuario_asignado }}
+                    {% else %}
+                        <span class="text-muted">Sin asignar</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historial de Traslados</h5>
+        <a href="{% url 'inventario:bien_list' %}" class="btn btn-light btn-sm">
+            <i class="fas fa-arrow-left me-1"></i>Volver a Lista
+        </a>
+    </div>
+    <div class="card-body">
+        {% if historial %}
+            <div class="timeline">
+                {% for item in historial %}
+                    <div class="timeline-item mb-4">
+                        <div class="card {% if item.tipo == 'actual' %}border-success{% elif item.tipo == 'traslado' %}border-primary{% else %}border-secondary{% endif %}">
+                            <div class="card-header {% if item.tipo == 'actual' %}bg-success text-white{% elif item.tipo == 'traslado' %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        {% if item.tipo == 'actual' %}
+                                            <i class="fas fa-check-circle me-2"></i>Estado Actual
+                                        {% elif item.tipo == 'traslado' %}
+                                            <i class="fas fa-exchange-alt me-2"></i>Traslado
+                                        {% else %}
+                                            <i class="fas fa-info-circle me-2"></i>Sin Historial
+                                        {% endif %}
+                                    </h6>
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if item.tipo == 'traslado' and item.id %}
+                                            <a href="{% url 'inventario:reporte_asignacion_traslado' item.id %}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-light" 
+                                               title="Reimprimir Ficha de Asignación">
+                                                <i class="fas fa-print me-1"></i>Reimprimir Ficha
+                                            </a>
+                                        {% endif %}
+                                        <span class="badge bg-light text-dark">{{ item.fecha }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {% if item.tipo == 'actual' %}
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Usuario:</strong> {{ item.usuario }}</p>
+                                            <p><strong>Local:</strong> {{ item.local }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Área:</strong> {{ item.area|default:"-" }}</p>
+                                            <p><strong>Oficina:</strong> {{ item.oficina|default:"-" }}</p>
+                                        </div>
+                                    </div>
+                                {% elif item.tipo == 'traslado' %}
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <h6 class="text-danger"><i class="fas fa-arrow-left me-2"></i>Origen</h6>
+                                            <p><strong>Usuario:</strong> {{ item.usuario_origen }}</p>
+                                            <p><strong>Local:</strong> {{ item.local_origen }}</p>
+                                            <p><strong>Área:</strong> {{ item.area_origen|default:"-" }}</p>
+                                            <p><strong>Oficina:</strong> {{ item.oficina_origen|default:"-" }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-success"><i class="fas fa-arrow-right me-2"></i>Destino</h6>
+                                            <p><strong>Usuario:</strong> {{ item.usuario_destino }}</p>
+                                            <p><strong>Local:</strong> {{ item.local_destino }}</p>
+                                            <p><strong>Área:</strong> {{ item.area_destino|default:"-" }}</p>
+                                            <p><strong>Oficina:</strong> {{ item.oficina_destino|default:"-" }}</p>
+                                        </div>
+                                    </div>
+                                    {% if item.observaciones %}
+                                        <div class="alert alert-info mb-0">
+                                            <strong>Observaciones:</strong> {{ item.observaciones }}
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <p class="text-muted">{{ item.observaciones }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                No se encontró historial de traslados para este bien.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .timeline-item {
+        position: relative;
+    }
+    
+    .timeline-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: -20px;
+        width: 2px;
+        height: 20px;
+        background-color: #dee2e6;
+        transform: translateX(-50%);
+    }
+</style>
+{% endblock %}

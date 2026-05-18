@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Generación de Etiquetas - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Generación de Etiquetas{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-2">Generación de Etiquetas</h2>
+        <p class="text-muted">Configure los filtros para generar etiquetas de bienes patrimoniales</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Formato de Etiqueta:</strong></p>
+                <ul class="small">
+                    <li>Logo a la izquierda</li>
+                    <li>Código QR a la derecha</li>
+                    <li>Información del bien en el centro</li>
+                    <li>Año seleccionable</li>
+                </ul>
+                <hr>
+                <p class="small text-muted">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    El campo "Año" es obligatorio y aparecerá en todas las etiquetas generadas.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoGeneracion = document.getElementById('id_tipo_generacion');
+    const campoAño = document.getElementById('campo-año');
+    const campoBien = document.getElementById('campo-bien');
+    const campoLocal = document.getElementById('campo-local');
+    const campoArea = document.getElementById('campo-area');
+    const campoOficina = document.getElementById('campo-oficina');
+    const campoAñoAdquisicion = document.getElementById('campo-año-adquisicion');
+    
+    const bienSearch = document.getElementById('bien-search');
+    const bienSelect = document.getElementById('id_bien');
+    
+    function toggleCampos() {
+        // Ocultar todos los campos primero
+        campoBien.style.display = 'none';
+        campoLocal.style.display = 'none';
+        campoArea.style.display = 'none';
+        campoOficina.style.display = 'none';
+        campoAñoAdquisicion.style.display = 'none';
+        
+        // Mostrar el campo según la selección
+        const valor = tipoGeneracion.value;
+        if (valor === 'bien_especifico') {
+            campoBien.style.display = 'block';
+        } else if (valor === 'por_local') {
+            campoLocal.style.display = 'block';
+        } else if (valor === 'por_area') {
+            campoArea.style.display = 'block';
+        } else if (valor === 'por_oficina') {
+            campoOficina.style.display = 'block';
+        } else if (valor === 'por_año') {
+            campoAñoAdquisicion.style.display = 'block';
+        }
+    }
+    
+    function debounce(fn, delay) {
+        let timer = null;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+    
+    function setBienOptions(results) {
+        if (!bienSelect) {
+            return;
+        }
+        const currentValue = bienSelect.value;
+        const currentText = bienSelect.options[bienSelect.selectedIndex]?.text || '';
+        bienSelect.innerHTML = '';
+        
+        const placeholder = new Option('Seleccione un bien', '', true, false);
+        placeholder.disabled = true;
+        if (currentValue) {
+            placeholder.selected = false;
+        }
+        bienSelect.add(placeholder);
+        
+        const added = new Set();
+        if (currentValue) {
+            const opt = new Option(currentText || 'Bien seleccionado', currentValue, true, true);
+            bienSelect.add(opt);
+            added.add(String(currentValue));
+        }
+        
+        results.forEach(item => {
+            const key = String(item.id);
+            if (added.has(key)) {
+                return;
+            }
+            const opt = new Option(item.text, item.id, false, false);
+            bienSelect.add(opt);
+        });
+    }
+    
+    async function buscarBienes(query) {
+        if (!bienSelect) {
+            return;
+        }
+        if (query.length < 2) {
+            setBienOptions([]);
+            return;
+        }
+        const url = bienSelect.getAttribute('data-ajax-url') || '';
+        try {
+            const response = await fetch(`${url}?q=${encodeURIComponent(query)}`);
+            if (!response.ok) {
+                return;
+            }
+            const data = await response.json();
+            setBienOptions(data.results || []);
+        } catch (error) {
+            // Silencio intencional: evita romper el formulario por fallos de red
+        }
+    }
+    
+    if (bienSearch) {
+        bienSearch.addEventListener('input', debounce((e) => {
+            buscarBienes(e.target.value.trim());
+        }, 300));
+    }
+    
+    tipoGeneracion.addEventListener('change', toggleCampos);
+    toggleCampos(); // Ejecutar al cargar la página
+});
+</script>
+{% endblock %}

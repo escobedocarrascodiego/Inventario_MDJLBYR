@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Sistema de Inventario Patrimonial{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; }
+
+    .kpi-card {
+        background: #fff;
+        border-radius: .75rem;
+        padding: 1.25rem 1.35rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border: 1px solid #e2e8f0;
+        transition: transform .2s, box-shadow .2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.07); }
+    .kpi-icon {
+        width: 48px; height: 48px;
+        border-radius: .6rem;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.15rem;
+        flex-shrink: 0;
+    }
+    .kpi-icon.blue   { background: #dbeafe; color: #2563eb; }
+    .kpi-icon.red    { background: #fee2e2; color: #dc2626; }
+    .kpi-icon.green  { background: #d1fae5; color: #059669; }
+    .kpi-icon.amber  { background: #fef3c7; color: #d97706; }
+    .kpi-icon.purple { background: #ede9fe; color: #7c3aed; }
+    .kpi-icon.cyan   { background: #cffafe; color: #0891b2; }
+    .kpi-value { font-size: 1.5rem; font-weight: 700; color: #0f172a; line-height: 1; }
+    .kpi-label { font-size: .75rem; color: #64748b; margin-top: 2px; font-weight: 500; }
+
+    .section-title {
+        font-size: .8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #475569;
+        margin-bottom: .75rem;
+    }
+
+    /* Charts */
+    .chart-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: .75rem;
+        padding: 1.25rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .chart-card-title {
+        font-size: .85rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+    .chart-card-title i { color: #64748b; font-size: .8rem; }
+    .chart-wrapper {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 220px;
+        position: relative;
+    }
+
+    /* Distribution table */
+    .dist-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+    .dist-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width .6s ease;
+    }
+
+    /* Quick Actions */
+    .qa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 1rem; }
+    .qa-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: .75rem;
+        padding: 1.25rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        text-decoration: none;
+        color: inherit;
+        transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .qa-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,.07);
+        border-color: #3b82f6;
+        color: inherit;
+    }
+    .qa-icon {
+        width: 42px; height: 42px;
+        border-radius: .5rem;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+    .qa-card h6 { font-size: .82rem; font-weight: 600; margin-bottom: 2px; }
+    .qa-card p  { font-size: .72rem; color: #64748b; margin: 0; line-height: 1.4; }
+
+    @media (max-width: 767.98px) {
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        .qa-grid  { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ===== KPI CARDS ===== -->
+<div class="section-title">Resumen General</div>
+<div class="kpi-grid mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon blue"><i class="fas fa-box"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_bienes|default:0 }}</div>
+            <div class="kpi-label">Bienes Activos</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon red"><i class="fas fa-box-open"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_bienes_baja|default:0 }}</div>
+            <div class="kpi-label">Bienes en Baja</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon green"><i class="fas fa-users"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_personal|default:0 }}</div>
+            <div class="kpi-label">Personal</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon amber"><i class="fas fa-map-marker-alt"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_locales|default:0 }}</div>
+            <div class="kpi-label">Locales</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon purple"><i class="fas fa-sitemap"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_areas|default:0 }}</div>
+            <div class="kpi-label">&Aacute;reas</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon cyan"><i class="fas fa-door-open"></i></div>
+        <div>
+            <div class="kpi-value">{{ total_oficinas|default:0 }}</div>
+            <div class="kpi-label">Oficinas</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CHARTS ROW 1 ===== -->
+<div class="section-title">An&aacute;lisis de Bienes Patrimoniales</div>
+<div class="row g-4 mb-4">
+    <!-- Donut: Distribución por Estado -->
+    <div class="col-lg-4 col-md-6">
+        <div class="chart-card">
+            <div class="chart-card-title"><i class="fas fa-chart-pie"></i> Distribuci&oacute;n por Estado</div>
+            <div class="chart-wrapper">
+                <canvas id="chartEstado"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Donut: Forma de Adquisición -->
+    <div class="col-lg-4 col-md-6">
+        <div class="chart-card">
+            <div class="chart-card-title"><i class="fas fa-chart-pie"></i> Forma de Adquisici&oacute;n</div>
+            <div class="chart-wrapper">
+                <canvas id="chartAdquisicion"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Donut: Situación -->
+    <div class="col-lg-4 col-md-6">
+        <div class="chart-card">
+            <div class="chart-card-title"><i class="fas fa-chart-pie"></i> Situaci&oacute;n Administrativa</div>
+            <div class="chart-wrapper">
+                <canvas id="chartSituacion"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ROW 2: Bienes por Local + Table ===== -->
+<div class="row g-4 mb-4">
+    <!-- Donut: Top Locales -->
+    <div class="col-lg-5">
+        <div class="chart-card">
+            <div class="chart-card-title"><i class="fas fa-chart-pie"></i> Bienes por Local (Top 10)</div>
+            <div class="chart-wrapper">
+                <canvas id="chartLocales"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de distribución por estado -->
+    <div class="col-lg-7">
+        <div class="chart-card" style="padding:0;">
+            <div class="chart-card-title" style="padding:1.25rem 1.25rem .75rem;">
+                <i class="fas fa-table"></i> Detalle por Estado
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="table table-hover mb-0" style="font-size:.82rem;">
+                    <thead>
+                        <tr class="table-light">
+                            <th style="padding:.65rem 1rem;">Estado</th>
+                            <th style="padding:.65rem 1rem;" class="text-end">Cantidad</th>
+                            <th style="padding:.65rem 1rem; width:40%;">Proporci&oacute;n</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in estados_data %}
+                        <tr>
+                            <td style="padding:.55rem 1rem;">
+                                {% if item.estado == 'BUENO' %}
+                                    <span class="badge bg-success bg-opacity-10 text-success">{{ item.estado }}</span>
+                                {% elif item.estado == 'REGULAR' %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning">{{ item.estado }}</span>
+                                {% elif item.estado == 'MALO' %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger">{{ item.estado }}</span>
+                                {% elif item.estado == 'NUEVO' %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary">{{ item.estado }}</span>
+                                {% elif item.estado == 'BAJA' %}
+                                    <span class="badge bg-dark bg-opacity-10 text-dark">{{ item.estado }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ item.estado }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding:.55rem 1rem;" class="text-end fw-semibold">{{ item.total }}</td>
+                            <td style="padding:.55rem 1rem;">
+                                <div class="dist-bar">
+                                    <div class="dist-bar-fill
+                                        {% if item.estado == 'BUENO' %}bg-success
+                                        {% elif item.estado == 'REGULAR' %}bg-warning
+                                        {% elif item.estado == 'MALO' %}bg-danger
+                                        {% elif item.estado == 'NUEVO' %}bg-primary
+                                        {% elif item.estado == 'BAJA' %}bg-dark
+                                        {% else %}bg-secondary{% endif %}"
+                                        style="width:{% widthratio item.total total_bienes 100 %}%;">
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center text-muted py-3">Sin datos</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== QUICK ACTIONS ===== -->
+<div class="section-title">Acceso R&aacute;pido</div>
+<div class="qa-grid mb-4">
+    <a href="{% url 'inventario:bien_create' %}" class="qa-card">
+        <div class="qa-icon" style="background:#dbeafe; color:#2563eb;"><i class="fas fa-plus"></i></div>
+        <div>
+            <h6>Registrar Bien</h6>
+            <p>Dar de alta un nuevo bien patrimonial en el sistema</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:personal_create' %}" class="qa-card">
+        <div class="qa-icon" style="background:#d1fae5; color:#059669;"><i class="fas fa-user-plus"></i></div>
+        <div>
+            <h6>Nuevo Personal</h6>
+            <p>Registrar un nuevo empleado responsable</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:traslado_bienes_index' %}" class="qa-card">
+        <div class="qa-icon" style="background:#cffafe; color:#0891b2;"><i class="fas fa-exchange-alt"></i></div>
+        <div>
+            <h6>Trasladar Bienes</h6>
+            <p>Mover bienes entre personal u oficinas</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:baja_bien_create' %}" class="qa-card">
+        <div class="qa-icon" style="background:#fee2e2; color:#dc2626;"><i class="fas fa-ban"></i></div>
+        <div>
+            <h6>Registrar Baja</h6>
+            <p>Dar de baja un bien patrimonial</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:escanear_codigos_barras' %}" class="qa-card">
+        <div class="qa-icon" style="background:#ede9fe; color:#7c3aed;"><i class="fas fa-barcode"></i></div>
+        <div>
+            <h6>Escanear C&oacute;digos</h6>
+            <p>Traslado masivo por c&oacute;digo de barras</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:reportes_index' %}" class="qa-card">
+        <div class="qa-icon" style="background:#fef3c7; color:#d97706;"><i class="fas fa-file-pdf"></i></div>
+        <div>
+            <h6>Reportes</h6>
+            <p>Generar reportes PDF y Excel del inventario</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:etiquetas_index' %}" class="qa-card">
+        <div class="qa-icon" style="background:#e0f2fe; color:#0284c7;"><i class="fas fa-tags"></i></div>
+        <div>
+            <h6>Etiquetas</h6>
+            <p>Imprimir etiquetas con c&oacute;digo patrimonial</p>
+        </div>
+    </a>
+    <a href="{% url 'inventario:importar_inventario' %}" class="qa-card">
+        <div class="qa-icon" style="background:#f0fdf4; color:#16a34a;"><i class="fas fa-file-upload"></i></div>
+        <div>
+            <h6>Carga Masiva</h6>
+            <p>Importar bienes desde archivo CSV</p>
+        </div>
+    </a>
+</div>
+
+<!-- ===== SECONDARY KPIS ===== -->
+<div class="section-title">Indicadores Adicionales</div>
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="kpi-card">
+            <div class="kpi-icon purple"><i class="fas fa-tags"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_denominaciones|default:0 }}</div>
+                <div class="kpi-label">Denominaciones Activas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="kpi-card">
+            <div class="kpi-icon cyan"><i class="fas fa-exchange-alt"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_traslados|default:0 }}</div>
+                <div class="kpi-label">Traslados Realizados</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="kpi-card">
+            <div class="kpi-icon amber"><i class="fas fa-door-open"></i></div>
+            <div>
+                <div class="kpi-value">{{ total_oficinas|default:0 }}</div>
+                <div class="kpi-label">Oficinas Registradas</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+    const PALETTE = [
+        '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+        '#06b6d4','#ec4899','#14b8a6','#f97316','#6366f1',
+        '#84cc16','#e11d48','#0ea5e9','#a855f7','#22c55e'
+    ];
+
+    const ESTADO_COLORS = {
+        'BUENO':    '#10b981',
+        'REGULAR':  '#f59e0b',
+        'MALO':     '#ef4444',
+        'NUEVO':    '#3b82f6',
+        'BAJA':     '#374151',
+        'CHADARRA': '#6b7280',
+        'RAEE':     '#06b6d4'
+    };
+
+    const defaultOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 14,
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    font: { family: 'Inter', size: 11 }
+                }
+            },
+            tooltip: {
+                backgroundColor: '#0f172a',
+                titleFont: { family: 'Inter', size: 12 },
+                bodyFont: { family: 'Inter', size: 11 },
+                padding: 10,
+                cornerRadius: 8,
+                callbacks: {
+                    label: function(ctx) {
+                        const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                        const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                        return ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${pct}%)`;
+                    }
+                }
+            }
+        }
+    };
+
+    function buildDonut(canvasId, rawData, labelKey, colorMap) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !rawData || rawData.length === 0) return;
+
+        const labels = rawData.map(d => d[labelKey] || 'N/A');
+        const values = rawData.map(d => d.total);
+        let bgColors;
+        if (colorMap) {
+            bgColors = labels.map((l, i) => colorMap[l] || PALETTE[i % PALETTE.length]);
+        } else {
+            bgColors = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+        }
+
+        new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: bgColors,
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverBorderWidth: 3,
+                    hoverOffset: 6
+                }]
+            },
+            options: defaultOpts
+        });
+    }
+
+    const estadosRaw     = {{ estados_json|safe }};
+    const adquisicionRaw = {{ adquisicion_json|safe }};
+    const localesRaw     = {{ locales_json|safe }};
+    const situacionRaw   = {{ situacion_json|safe }};
+
+    buildDonut('chartEstado', estadosRaw, 'estado', ESTADO_COLORS);
+    buildDonut('chartAdquisicion', adquisicionRaw, 'forma_adquisicion', null);
+    buildDonut('chartSituacion', situacionRaw, 'situacion', {
+        'NORMAL':   '#10b981',
+        'SOBRANTE': '#f59e0b',
+        'FALTANTE': '#ef4444'
+    });
+    buildDonut('chartLocales', localesRaw, 'local__nombre', null);
+})();
+</script>
+{% endblock %}

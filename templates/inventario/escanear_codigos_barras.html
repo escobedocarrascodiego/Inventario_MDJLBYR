@@ -1,0 +1,549 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Escanear Códigos de Barras - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Escanear Códigos de Barras{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Escanear Códigos de Barras</h2>
+            <a href="{% url 'inventario:funciones_index' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-2"></i>Salir
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Panel de escaneo -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-barcode me-2"></i>Escaneo de Códigos</h5>
+                    <span class="badge bg-light text-dark" id="contadorPendientes">Pendientes: 0</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="alertEscaneo" class="alert d-none" role="alert"></div>
+
+                <div class="input-group mb-3">
+                    <span class="input-group-text"><i class="fas fa-barcode"></i></span>
+                    <input type="text" id="barcodeInput" class="form-control" placeholder="Escanee el código patrimonial..." autocomplete="off">
+                    <button type="button" class="btn btn-info text-white" id="btnAgregarCodigo">
+                        <i class="fas fa-plus me-2"></i>Agregar
+                    </button>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">Los códigos escaneados se registran automáticamente.</small>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="btnLimpiarEscaneos">
+                        <i class="fas fa-trash me-1"></i>Limpiar lista
+                    </button>
+                </div>
+
+                <div class="border rounded p-2" style="height: 420px; overflow-y: auto; background-color: #f8f9fa;">
+                    <table class="table table-sm table-hover mb-0" id="tablaEscaneos">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>#</th>
+                                <th>CODIGO</th>
+                                <th>DESCRIPCION</th>
+                                <th>USUARIO ACTUAL</th>
+                                <th>OFICINA ACTUAL</th>
+                                <th>ESTADO</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyEscaneos">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">
+                                    <small>No hay códigos escaneados aún</small>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de destino -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Destino del Traslado</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label"><strong>Usuario destino:</strong></label>
+                    <select id="usuario_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Local destino:</strong></label>
+                    <select id="local_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                        {% for local in locales %}
+                        <option value="{{ local.id }}">{{ local.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Área destino:</strong></label>
+                    <select id="area_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                        {% for area in areas %}
+                        <option value="{{ area.id }}">{{ area.nombre }}{% if area.siglas %} ({{ area.siglas }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Oficina destino:</strong></label>
+                    <select id="oficina_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Ubicación física:</strong></label>
+                    <select id="ubicacion_destino" class="form-select">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Observaciones (opcional):</strong></label>
+                    <textarea id="observaciones" class="form-control" rows="3" placeholder="Detalle adicional del traslado"></textarea>
+                </div>
+
+                <div class="d-grid">
+                    <button type="button" class="btn btn-success" id="btnTrasladarEscaneos" disabled>
+                        <i class="fas fa-arrow-right me-2"></i>Trasladar escaneados
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<style>
+    .select2-container .select2-selection--single {
+        height: calc(2.375rem + 2px);
+        padding: 0.375rem 0.75rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5;
+        padding-left: 0;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(2.375rem + 2px);
+        right: 0.5rem;
+    }
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+let escaneos = {{ escaneos_json|safe }};
+let conflictoUsuarioMostrado = false;
+
+$(document).ready(function() {
+    const personalAjaxConfig = {
+        url: '{% url "inventario:buscar_personal" %}',
+        dataType: 'json',
+        delay: 250,
+        data: function(params) {
+            return { q: params.term || '' };
+        },
+        processResults: function(data) {
+            return { results: data.results || [] };
+        },
+        cache: true
+    };
+
+    $('#usuario_destino').select2({
+        placeholder: 'Seleccione...',
+        allowClear: true,
+        width: '100%',
+        minimumInputLength: 2,
+        ajax: personalAjaxConfig
+    });
+
+    $('#usuario_destino').on('change', function() {
+        const usuarioId = $(this).val();
+        if (usuarioId) {
+            obtenerUbicacionUsuario(usuarioId);
+        }
+        actualizarBotonTrasladar();
+    });
+
+    $('#local_destino').on('change', function() {
+        actualizarBotonTrasladar();
+    });
+
+    $('#area_destino').on('change', function() {
+        const areaId = $(this).val();
+        if (areaId) {
+            cargarOficinasPorArea(areaId, function() {
+                cargarUbicacionesPorAreaOficina(areaId, $('#oficina_destino').val());
+            });
+        } else {
+            $('#oficina_destino').html('<option value="">Seleccione...</option>');
+            $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+        }
+        actualizarBotonTrasladar();
+    });
+
+    $('#oficina_destino').on('change', function() {
+        const areaId = $('#area_destino').val();
+        const oficinaId = $(this).val();
+        cargarUbicacionesPorAreaOficina(areaId, oficinaId);
+        actualizarBotonTrasladar();
+    });
+
+    $('#btnAgregarCodigo').on('click', function() {
+        registrarEscaneo();
+    });
+
+    $('#barcodeInput').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            registrarEscaneo();
+        }
+    });
+
+    $('#btnLimpiarEscaneos').on('click', function() {
+        if (escaneos.length === 0) {
+            return;
+        }
+        if (!confirm('¿Desea limpiar la lista de escaneos?')) {
+            return;
+        }
+        $.ajax({
+            url: '{% url "inventario:limpiar_escaneos_codigo" %}',
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            success: function(response) {
+                if (response.success) {
+                    escaneos = [];
+                    renderEscaneos();
+                    mostrarAlerta('success', 'Lista limpiada.');
+                }
+            },
+            error: function() {
+                mostrarAlerta('danger', 'Error al limpiar la lista.');
+            }
+        });
+    });
+
+    $('#btnTrasladarEscaneos').on('click', function() {
+        ejecutarTrasladoEscaneos();
+    });
+
+    renderEscaneos();
+    $('#barcodeInput').focus();
+});
+
+function registrarEscaneo() {
+    const codigo = ($('#barcodeInput').val() || '').trim();
+    if (!codigo) {
+        mostrarAlerta('warning', 'Ingrese un código válido.');
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:registrar_escaneo_codigo" %}',
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        contentType: 'application/json',
+        data: JSON.stringify({ codigo: codigo }),
+        success: function(response) {
+            if (response.success) {
+                if (!response.exists) {
+                    escaneos.unshift(response.escaneo);
+                }
+                renderEscaneos();
+                mostrarAlerta('info', response.message || 'Código procesado.');
+                $('#barcodeInput').val('').focus();
+            } else {
+                mostrarAlerta('danger', response.error || 'No se pudo registrar el código.');
+            }
+        },
+        error: function() {
+            mostrarAlerta('danger', 'Error al registrar el código.');
+        }
+    });
+}
+
+function eliminarEscaneo(id) {
+    $.ajax({
+        url: '{% url "inventario:eliminar_escaneo_codigo" 0 %}'.replace('0', id),
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        success: function(response) {
+            if (response.success) {
+                escaneos = escaneos.filter(e => e.id !== id);
+                renderEscaneos();
+            }
+        },
+        error: function() {
+            mostrarAlerta('danger', 'Error al eliminar el escaneo.');
+        }
+    });
+}
+
+function renderEscaneos() {
+    const tbody = $('#tbodyEscaneos');
+    tbody.empty();
+
+    if (!escaneos || escaneos.length === 0) {
+        tbody.append(`
+            <tr>
+                <td colspan="7" class="text-center text-muted">
+                    <small>No hay códigos escaneados aún</small>
+                </td>
+            </tr>
+        `);
+        actualizarBotonTrasladar();
+        return;
+    }
+
+    escaneos.forEach(function(escaneo, index) {
+        const badge = renderEstadoBadge(escaneo.estado);
+        const mensaje = escaneo.mensaje_error ? `<div class="text-danger small">${escaneo.mensaje_error}</div>` : '';
+        tbody.append(`
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escaneo.codigo_patrimonial}</td>
+                <td>${escaneo.descripcion}${mensaje}</td>
+                <td>${escaneo.usuario_actual}</td>
+                <td>${escaneo.oficina_actual}</td>
+                <td>${badge}</td>
+                <td class="text-end">
+                    <button class="btn btn-outline-danger btn-sm" title="Quitar" onclick="eliminarEscaneo(${escaneo.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </td>
+            </tr>
+        `);
+    });
+
+    actualizarBotonTrasladar();
+}
+
+function renderEstadoBadge(estado) {
+    if (estado === 'PROCESADO') {
+        return '<span class="badge bg-success">Procesado</span>';
+    }
+    if (estado === 'ERROR') {
+        return '<span class="badge bg-danger">Error</span>';
+    }
+    return '<span class="badge bg-warning text-dark">Pendiente</span>';
+}
+
+function actualizarBotonTrasladar() {
+    const pendientes = escaneos.filter(e => e.estado === 'PENDIENTE').length;
+    const usuarioSeleccionado = $('#usuario_destino').val();
+    const tieneUsuario = usuarioSeleccionado !== '';
+    const tieneLocal = $('#local_destino').val() !== '';
+    const conflictoUsuario = escaneos.some(e => 
+        e.estado === 'PENDIENTE' &&
+        e.usuario_actual_id &&
+        usuarioSeleccionado &&
+        String(e.usuario_actual_id) === String(usuarioSeleccionado)
+    );
+    $('#contadorPendientes').text(`Pendientes: ${pendientes}`);
+    $('#btnTrasladarEscaneos').prop('disabled', !(pendientes > 0 && tieneUsuario && tieneLocal && !conflictoUsuario));
+
+    if (conflictoUsuario) {
+        if (!conflictoUsuarioMostrado) {
+            mostrarAlerta('warning', 'El usuario destino no puede ser el mismo usuario actual de los bienes.');
+            conflictoUsuarioMostrado = true;
+        }
+    } else {
+        conflictoUsuarioMostrado = false;
+    }
+}
+
+function ejecutarTrasladoEscaneos() {
+    const pendientes = escaneos.filter(e => e.estado === 'PENDIENTE').length;
+    if (pendientes === 0) {
+        mostrarAlerta('warning', 'No hay bienes pendientes para trasladar.');
+        return;
+    }
+
+    if (!confirm(`¿Desea trasladar ${pendientes} bien(es)?`)) {
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:ejecutar_traslado_escaneados" %}',
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        contentType: 'application/json',
+        data: JSON.stringify({
+            usuario_destino_id: $('#usuario_destino').val(),
+            local_destino_id: $('#local_destino').val() || '',
+            area_destino_id: $('#area_destino').val() || '',
+            oficina_destino_id: $('#oficina_destino').val() || '',
+            ubicacion_destino_id: $('#ubicacion_destino').val() || '',
+            observaciones: $('#observaciones').val() || ''
+        }),
+        success: function(response) {
+            if (response.success) {
+                mostrarAlerta('success', response.message || 'Traslado realizado.');
+                if (response.traslados_ids && response.traslados_ids.length > 0) {
+                    if (confirm(response.message + '\n\n¿Desea imprimir el reporte de asignación?')) {
+                        const reporteUrl = '{% url "inventario:reporte_asignacion_traslado" 0 %}'.replace('0', response.traslados_ids[0]);
+                        window.open(reporteUrl, '_blank');
+                    }
+                }
+
+                const errores = response.errores || [];
+                if (errores.length > 0) {
+                    errores.forEach(function(item) {
+                        const escaneo = escaneos.find(e => e.codigo_patrimonial === item.codigo);
+                        if (escaneo) {
+                            escaneo.estado = 'ERROR';
+                            escaneo.mensaje_error = item.error || 'Error al trasladar';
+                        }
+                    });
+                    escaneos = escaneos.filter(e => e.estado === 'ERROR');
+                    mostrarAlerta('warning', 'Algunos códigos no pudieron trasladarse.');
+                } else {
+                    escaneos = escaneos.filter(e => e.estado === 'ERROR');
+                }
+
+                renderEscaneos();
+            } else {
+                mostrarAlerta('danger', response.error || 'No se pudo completar el traslado.');
+            }
+        },
+        error: function() {
+            mostrarAlerta('danger', 'Error al ejecutar el traslado.');
+        }
+    });
+}
+
+function cargarOficinasPorArea(areaId, callback) {
+    if (!areaId) {
+        $('#oficina_destino').html('<option value="">Seleccione...</option>');
+        if (callback) callback();
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:obtener_oficinas_por_area" %}',
+        method: 'GET',
+        data: { 'area_id': areaId },
+        success: function(response) {
+            const select = $('#oficina_destino');
+            select.html('<option value="">Seleccione...</option>');
+            if (response.oficinas && response.oficinas.length > 0) {
+                response.oficinas.forEach(function(oficina) {
+                    select.append(`<option value="${oficina.id}">${oficina.nombre}</option>`);
+                });
+            }
+            if (callback) callback();
+        },
+        error: function() {
+            $('#oficina_destino').html('<option value="">Error al cargar</option>');
+            if (callback) callback();
+        }
+    });
+}
+
+function cargarUbicacionesPorAreaOficina(areaId, oficinaId) {
+    if (!areaId && !oficinaId) {
+        $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
+        return;
+    }
+    $.ajax({
+        url: '{% url "inventario:obtener_ubicaciones_fisicas" %}',
+        method: 'GET',
+        data: {
+            area_id: areaId || '',
+            oficina_id: oficinaId || ''
+        },
+        success: function(response) {
+            const select = $('#ubicacion_destino');
+            select.html('<option value="">Seleccione...</option>');
+            if (response.ubicaciones && response.ubicaciones.length > 0) {
+                response.ubicaciones.forEach(function(ubicacion) {
+                    select.append(`<option value="${ubicacion.id}">${ubicacion.nombre}</option>`);
+                });
+            }
+        },
+        error: function() {
+            $('#ubicacion_destino').html('<option value="">Error al cargar</option>');
+        }
+    });
+}
+
+function obtenerUbicacionUsuario(usuarioId) {
+    const url = '{% url "inventario:obtener_ubicacion_usuario" 999 %}'.replace('999', usuarioId);
+    $.ajax({
+        url: url,
+        method: 'GET',
+        success: function(response) {
+            if (!response || response.error) {
+                return;
+            }
+
+            if (response.local_id) {
+                $('#local_destino').val(String(response.local_id));
+            }
+            if (response.area_id) {
+                $('#area_destino').val(String(response.area_id));
+                cargarOficinasPorArea(response.area_id, function() {
+                    if (response.oficina_id) {
+                        $('#oficina_destino').val(String(response.oficina_id));
+                    }
+                    cargarUbicacionesPorAreaOficina(response.area_id, response.oficina_id);
+                });
+            }
+            actualizarBotonTrasladar();
+        }
+    });
+}
+
+function mostrarAlerta(tipo, mensaje) {
+    const alertBox = $('#alertEscaneo');
+    alertBox.removeClass('d-none alert-success alert-danger alert-warning alert-info');
+    alertBox.addClass(`alert-${tipo}`);
+    alertBox.text(mensaje);
+    setTimeout(() => alertBox.addClass('d-none'), 3500);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

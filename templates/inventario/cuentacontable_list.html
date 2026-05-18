@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cuentas Contables - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Cuentas Contables{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Lista de Cuentas Contables</h5>
+        <a href="{% url 'inventario:cuentacontable_create' %}" class="btn btn-light btn-sm">
+            <i class="fas fa-plus me-1"></i>Nueva Cuenta
+        </a>
+    </div>
+    <div class="card-body">
+        <!-- Tabla de cuentas contables -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover data-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>N°</th>
+                        <th>Código</th>
+                        <th>Descripción</th>
+                        <th>Tasa Deprec.</th>
+                        <th>Vida Útil (meses)</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Las filas se cargarán dinámicamente vía DataTables (server-side) -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        var table = $('.data-table').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{% url 'inventario:cuentas_contables_datatable' %}",
+                type: "GET"
+            },
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            },
+            responsive: true,
+            pageLength: 25,
+            order: [[1, 'asc']],
+            columns: [
+                { data: 0 },
+                { data: 1 },
+                { data: 2 },
+                { data: 3 },
+                { data: 4 },
+                { data: 5 }
+            ],
+            columnDefs: [
+                { orderable: false, targets: [0, 5] }
+            ]
+        });
+    });
+</script>
+{% endblock %}
+
+
+

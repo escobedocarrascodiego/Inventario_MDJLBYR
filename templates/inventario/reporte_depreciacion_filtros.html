@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Reporte de Depreciación - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Reporte de Depreciación{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-2">Reporte de Depreciación</h2>
+        <p class="text-muted">Seleccione filtros para generar el reporte en PDF.</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{% url 'inventario:reporte_depreciacion' %}" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Local:</label>
+                <select name="local_id" id="local_filtro" class="form-select">
+                    <option value="">Todos</option>
+                    {% for local in locales %}
+                        <option value="{{ local.id }}">{{ local.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Área:</label>
+                <select name="area_id" id="area_filtro" class="form-select">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Oficina:</label>
+                <select name="oficina_id" id="oficina_filtro" class="form-select">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Denominación:</label>
+                <select name="denominacion_id" class="form-select">
+                    <option value="">Todas</option>
+                    {% for denominacion in denominaciones %}
+                        <option value="{{ denominacion.id }}">{{ denominacion.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Cuenta contable:</label>
+                <select name="cuenta_contable_id" class="form-select">
+                    <option value="">Todas</option>
+                    {% for cuenta in cuentas_contables %}
+                        <option value="{{ cuenta.id }}">{{ cuenta.codigo }} - {{ cuenta.descripcion }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-secondary">
+                    <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function cargarAreasPorLocal(localId, callback) {
+    if (!localId) {
+        const areaSelect = $('#area_filtro');
+        areaSelect.html('<option value="">Todas</option>');
+        if (callback) callback();
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:obtener_areas_por_local" %}',
+        method: 'GET',
+        data: {'local_id': localId},
+        success: function(response) {
+            const areaSelect = $('#area_filtro');
+            areaSelect.html('<option value="">Todas</option>');
+            if (response.areas && response.areas.length > 0) {
+                response.areas.forEach(function(area) {
+                    areaSelect.append(`<option value="${area.id}">${area.nombre}${area.siglas ? ' (' + area.siglas + ')' : ''}</option>`);
+                });
+            }
+            if (callback) callback();
+        },
+        error: function() {
+            $('#area_filtro').html('<option value="">Error al cargar</option>');
+            if (callback) callback();
+        }
+    });
+}
+
+function cargarOficinasPorArea(areaId) {
+    if (!areaId) {
+        $('#oficina_filtro').html('<option value="">Todas</option>');
+        return;
+    }
+
+    $.ajax({
+        url: '{% url "inventario:obtener_oficinas_por_area" %}',
+        method: 'GET',
+        data: {'area_id': areaId},
+        success: function(response) {
+            const oficinaSelect = $('#oficina_filtro');
+            oficinaSelect.html('<option value="">Todas</option>');
+            if (response.oficinas && response.oficinas.length > 0) {
+                response.oficinas.forEach(function(oficina) {
+                    oficinaSelect.append(`<option value="${oficina.id}">${oficina.nombre}</option>`);
+                });
+            }
+        },
+        error: function() {
+            $('#oficina_filtro').html('<option value="">Error al cargar</option>');
+        }
+    });
+}
+
+$(document).ready(function() {
+    $('#local_filtro').on('change', function() {
+        const newLocalId = $(this).val();
+        cargarAreasPorLocal(newLocalId, function() {
+            $('#oficina_filtro').html('<option value="">Todas</option>');
+        });
+    });
+
+    $('#area_filtro').on('change', function() {
+        const newAreaId = $(this).val();
+        cargarOficinasPorArea(newAreaId);
+    });
+});
+</script>
+{% endblock %}

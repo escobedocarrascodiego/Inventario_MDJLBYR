@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Generación de Reportes - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Generación de Reportes{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-2">Generación de Reportes</h2>
+        <p class="text-muted">Seleccione el tipo de reporte que desea generar en PDF o Excel</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Reporte de Bienes Activos Detallado -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-file-alt fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes Activos Detallado</h5>
+                <p class="card-text text-muted mb-4">
+                    Reporte completo y detallado de todos los bienes activos del inventario patrimonial con todos los datos disponibles.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:reporte_bienes_activos' %}" class="btn btn-primary btn-sm" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                    </a>
+                    <a href="{% url 'inventario:reporte_excel_bienes_detallados' %}" class="btn btn-success btn-sm" target="_blank">
+                        <i class="fas fa-file-excel me-2"></i>Generar Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte de Bienes por Local -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-building fa-3x text-info"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes por Local</h5>
+                <p class="card-text text-muted mb-4">
+                    Reporte de bienes agrupados por local, mostrando el inventario de cada ubicación.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:reporte_bienes_por_local' %}" class="btn btn-info btn-sm" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                    </a>
+                    <a href="{% url 'inventario:reporte_excel_bienes_por_local' %}" class="btn btn-success btn-sm" target="_blank">
+                        <i class="fas fa-file-excel me-2"></i>Generar Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte de Bienes Dados de Baja -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-trash-alt fa-3x text-danger"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes Dados de Baja</h5>
+                <p class="card-text text-muted mb-4">
+                    Reporte de todos los bienes que han sido dados de baja del inventario patrimonial.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:reporte_bienes_baja' %}" class="btn btn-danger btn-sm" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                    </a>
+                    <a href="{% url 'inventario:reporte_excel_bienes_baja' %}" class="btn btn-success btn-sm" target="_blank">
+                        <i class="fas fa-file-excel me-2"></i>Generar Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte por Cuentas Contables -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-calculator fa-3x text-warning"></i>
+                </div>
+                <h5 class="card-title mb-3">Reporte por Cuentas Contables</h5>
+                <p class="card-text text-muted mb-4">
+                    Reporte agrupado por cuentas contables con cantidades, valores de adquisición y valores netos totalizados.
+                </p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalReporteCuentasContables">
+                        <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte de Depreciación -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-chart-line fa-3x text-secondary"></i>
+                </div>
+                <h5 class="card-title mb-3">Reporte de Depreciación</h5>
+                <p class="card-text text-muted mb-4">
+                    Depreciación anual, mensual y acumulada por bien según la tasa asignada.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:reporte_depreciacion_filtros' %}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fichas -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-file-alt fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title mb-3">Fichas</h5>
+                <p class="card-text text-muted mb-4">
+                    Fichas detalladas de bienes específicos: Computo y Vehículos.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:fichas_index' %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-file-pdf me-2"></i>Generar Ficha
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Nota:</strong> Los reportes se generan en formato PDF o Excel y se descargarán automáticamente. 
+            El proceso puede tardar unos segundos dependiendo de la cantidad de datos. 
+            Los reportes en Excel incluyen todos los datos detallados disponibles en el sistema.
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Reporte por Cuentas Contables -->
+<div class="modal fade" id="modalReporteCuentasContables" tabindex="-1" aria-labelledby="modalReporteCuentasContablesLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalReporteCuentasContablesLabel">
+                    <i class="fas fa-calculator me-2"></i>Reporte por Cuentas Contables
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">
+                    Seleccione el rango de fechas de adquisición de los bienes que desea incluir en el reporte.
+                </p>
+                <form id="formReporteCuentasContables">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="fechaDesdeCuentas" class="form-label"><strong>Fecha Desde:</strong></label>
+                            <input type="date" class="form-control" id="fechaDesdeCuentas" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fechaHastaCuentas" class="form-label"><strong>Fecha Hasta:</strong></label>
+                            <input type="date" class="form-control" id="fechaHastaCuentas" required>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning d-none" id="mensajeErrorCuentas" role="alert"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnGenerarReporteCuentas">
+                    <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Establecer fechas por defecto (últimos 30 días)
+    const hoy = new Date();
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hoy.getDate() - 30);
+    
+    $('#fechaHastaCuentas').val(hoy.toISOString().split('T')[0]);
+    $('#fechaDesdeCuentas').val(hace30Dias.toISOString().split('T')[0]);
+    
+    // Generar reporte al hacer clic en el botón
+    $('#btnGenerarReporteCuentas').on('click', function() {
+        const fechaDesde = $('#fechaDesdeCuentas').val();
+        const fechaHasta = $('#fechaHastaCuentas').val();
+        const mensajeError = $('#mensajeErrorCuentas');
+        
+        // Validar fechas
+        if (!fechaDesde || !fechaHasta) {
+            mensajeError.removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Por favor seleccione ambas fechas.');
+            return;
+        }
+        
+        if (fechaDesde > fechaHasta) {
+            mensajeError.removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>La fecha "Desde" debe ser anterior o igual a la fecha "Hasta".');
+            return;
+        }
+        
+        // Ocultar mensaje de error si todo está bien
+        mensajeError.addClass('d-none');
+        
+        // Construir URL con parámetros
+        const url = '{% url "inventario:reporte_por_cuentas_contables" %}?fecha_desde=' + fechaDesde + '&fecha_hasta=' + fechaHasta;
+        
+        // Cerrar modal y abrir reporte en nueva pestaña
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalReporteCuentasContables'));
+        if (modal) {
+            modal.hide();
+        }
+        window.open(url, '_blank');
+    });
+    
+    // Limpiar mensaje de error al cambiar fechas
+    $('#fechaDesdeCuentas, #fechaHastaCuentas').on('change', function() {
+        $('#mensajeErrorCuentas').addClass('d-none');
+    });
+    
+    // Permitir generar con Enter
+    $('#fechaDesdeCuentas, #fechaHastaCuentas').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            $('#btnGenerarReporteCuentas').click();
+        }
+    });
+
+});
+</script>
+{% endblock %}

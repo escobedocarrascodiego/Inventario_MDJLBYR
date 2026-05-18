@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Personal - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Eliminar Personal{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">¿Está seguro de que desea eliminar el siguiente personal?</p>
+                
+                <div class="alert alert-info">
+                    <strong>Nombre Completo:</strong> {{ object.apellidos }}, {{ object.nombres }}<br>
+                    <strong>Documento:</strong> {{ object.get_tipo_documento_display }}: {{ object.numero_documento }}<br>
+                    <strong>Modalidad:</strong> {{ object.get_modalidad_display }}<br>
+                    <strong>Cargo:</strong> {{ object.cargo|default:"-" }}<br>
+                    <strong>Oficina:</strong> {{ object.oficina|default:"-" }}
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'inventario:personal_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i>Sí, Eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

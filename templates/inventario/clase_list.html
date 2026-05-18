@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Clases - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Clases{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-folder me-2"></i>Lista de Clases</h5>
+        <a href="{% url 'inventario:clase_create' %}" class="btn btn-light btn-sm">
+            <i class="fas fa-plus me-1"></i>Nueva Clase
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover data-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>N°</th>
+                        <th>Nombre</th>
+                        <th>Grupo Genérico</th>
+                        <th>Cuenta Contable</th>
+                        <th>Descripción</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for clase in clases %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td><strong>{{ clase.nombre }}</strong></td>
+                        <td>{{ clase.grupo_generico }}</td>
+                        <td>{{ clase.cuenta_contable.codigo }} - {{ clase.cuenta_contable.descripcion|truncatewords:5 }}</td>
+                        <td>{{ clase.descripcion|default:"-"|truncatewords:10 }}</td>
+                        <td>
+                            {% if clase.activo %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{% url 'inventario:clase_update' clase.pk %}" 
+                                   class="btn btn-outline-primary" 
+                                   title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'inventario:clase_delete' clase.pk %}" 
+                                   class="btn btn-outline-danger" 
+                                   title="Eliminar"
+                                   onclick="return confirm('¿Está seguro de eliminar esta clase?');">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-row">
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p>No se encontraron clases.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        var table = $('.data-table');
+        if (table.length && table.find('tbody tr').length > 0) {
+            var hasData = table.find('tbody tr').not('.empty-row').length > 0;
+            if (hasData) {
+                table.DataTable({
+                    language: {
+                        url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+                    },
+                    responsive: true,
+                    pageLength: 25,
+                    order: [[1, 'asc']],
+                    columnDefs: [
+                        { orderable: false, targets: 6 }
+                    ]
+                });
+            }
+        }
+    });
+</script>
+{% endblock %}
+
+

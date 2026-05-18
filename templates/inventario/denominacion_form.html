@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-tags me-2"></i>{{ title }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'inventario:denominacion_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-save me-1"></i>Guardar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        var isEditMode = {% if form.instance.pk %}true{% else %}false{% endif %};
+        var cuentaContableIdEdit = {% if form.instance.pk and form.instance.cuenta_contable_id %}{{ form.instance.cuenta_contable_id }}{% else %}null{% endif %};
+
+        // Filtrar clases cuando cambie el grupo genérico
+        $('#id_grupo_generico').on('change', function() {
+            var grupoId = $(this).val();
+            var $claseSelect = $('#id_clase');
+            
+            if (grupoId) {
+                $.ajax({
+                    url: '{% url "inventario:obtener_clases_por_grupo" %}',
+                    method: 'GET',
+                    data: { 'grupo_id': grupoId },
+                    success: function(data) {
+                        $claseSelect.empty();
+                        $claseSelect.append('<option value="">---------</option>');
+                        $.each(data.clases, function(index, clase) {
+                            $claseSelect.append('<option value="' + clase.id + '">' + clase.nombre + '</option>');
+                        });
+                        // En edición no limpiar cuenta contable (mantener la seleccionada)
+                        if (!isEditMode) {
+                            $('#id_cuenta_contable').val('');
+                        } else if (cuentaContableIdEdit) {
+                            $('#id_cuenta_contable').val(cuentaContableIdEdit);
+                        }
+                        $('#clase-info').hide();
+                    }
+                });
+            } else {
+                $claseSelect.empty();
+                $claseSelect.append('<option value="">---------</option>');
+                if (!isEditMode) {
+                    $('#id_cuenta_contable').val('');
+                }
+            }
+        });
+        
+        // Auto-completar cuenta contable cuando se seleccione una clase (solo en creación; en edición no sobrescribir)
+        $('#id_clase').on('change', function() {
+            var claseId = $(this).val();
+            if (claseId) {
+                $.ajax({
+                    url: '{% url "inventario:obtener_clase_info" 0 %}'.replace('0', claseId),
+                    method: 'GET',
+                    success: function(data) {
+                        if (data.cuenta_contable_id) {
+                            $('#cuenta-contable-sugerida').text(
+                                data.cuenta_contable_codigo + ' - ' + data.cuenta_contable_descripcion
+                            );
+                            $('#clase-info').show();
+                            // En creación auto-seleccionar sugerida; en edición no sobrescribir
+                            if (!isEditMode) {
+                                $('#id_cuenta_contable').val(data.cuenta_contable_id);
+                            }
+                        } else {
+                            $('#clase-info').hide();
+                        }
+                    },
+                    error: function() {
+                        $('#clase-info').hide();
+                    }
+                });
+            } else {
+                $('#clase-info').hide();
+            }
+        });
+        
+        // Si es edición, cargar clases del grupo genérico y restaurar clase y cuenta contable
+        {% if form.instance.pk and form.instance.grupo_generico %}
+            var grupoId = $('#id_grupo_generico').val();
+            var claseIdEdit = {{ form.instance.clase.id }};
+            if (grupoId) {
+                $('#id_grupo_generico').trigger('change');
+                setTimeout(function() {
+                    $('#id_clase').val(claseIdEdit);
+                    if (cuentaContableIdEdit) {
+                        $('#id_cuenta_contable').val(cuentaContableIdEdit);
+                    }
+                }, 500);
+            }
+        {% endif %}
+    });
+</script>
+{% endblock %}
+
+

@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Generar Fichas - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Generar Fichas{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Generar Fichas de Bienes</h2>
+            <a href="{% url 'inventario:reportes_index' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Volver a Reportes
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Seleccionar Bien para Generar Ficha</h5>
+            </div>
+            <div class="card-body">
+                <form id="formFichas" onsubmit="return false;">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="tipoFicha" class="form-label"><strong>Tipo de Ficha:</strong></label>
+                            <select class="form-select form-select-lg" id="tipoFicha" required>
+                                <option value="">Seleccione el tipo de ficha...</option>
+                                <option value="computo">Ficha de Computo</option>
+                                <option value="vehiculo">Ficha de Vehículo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="buscarBienFicha" class="form-label"><strong>Buscar Bien:</strong></label>
+                            <input type="text" class="form-control form-control-lg" id="buscarBienFicha" 
+                                   placeholder="Buscar por código patrimonial, descripción, serie o placa...">
+                            <input type="hidden" id="bienIdFicha">
+                        </div>
+                    </div>
+                    
+                    <div id="resultadosBusquedaFicha" class="mb-3" style="max-height: 400px; overflow-y: auto; display: none;">
+                        <h6 class="mb-2"><strong>Resultados de la búsqueda:</strong></h6>
+                        <table class="table table-striped table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="15%">Código Patrimonial</th>
+                                    <th width="35%">Descripción</th>
+                                    <th width="25%">Marca / Modelo</th>
+                                    <th width="15%">Serie / Placa</th>
+                                    <th width="10%">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyResultadosFicha">
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-warning d-none" id="mensajeErrorFicha" role="alert"></div>
+                    
+                    <div id="infoBienSeleccionado" class="alert alert-success d-none" role="alert">
+                        <h6><i class="fas fa-check-circle me-2"></i><strong>Bien seleccionado:</strong></h6>
+                        <p class="mb-0" id="nombreBienSeleccionado"></p>
+                        <hr>
+                        <button type="button" class="btn btn-success btn-lg" id="btnGenerarFicha">
+                            <i class="fas fa-file-pdf me-2"></i>Generar Ficha PDF
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Prevenir submit del formulario
+    $('#formFichas').on('submit', function(e) {
+        e.preventDefault();
+        return false;
+    });
+    
+    let timeoutBusquedaFicha = null;
+    
+    // Buscar bienes al escribir
+    $('#buscarBienFicha').on('input', function() {
+        const query = $(this).val().trim();
+        const tipoFicha = $('#tipoFicha').val();
+        
+        clearTimeout(timeoutBusquedaFicha);
+        
+        if (query.length < 2) {
+            $('#resultadosBusquedaFicha').hide();
+            $('#tbodyResultadosFicha').empty();
+            return;
+        }
+        
+        if (!tipoFicha) {
+            $('#mensajeErrorFicha').removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Por favor seleccione primero el tipo de ficha.');
+            return;
+        }
+        
+        $('#mensajeErrorFicha').addClass('d-none');
+        
+        timeoutBusquedaFicha = setTimeout(function() {
+            buscarBienesParaFicha(query, tipoFicha);
+        }, 300);
+    });
+    
+    // Limpiar al cambiar tipo de ficha
+    $('#tipoFicha').on('change', function() {
+        $('#buscarBienFicha').val('');
+        $('#bienIdFicha').val('');
+        $('#resultadosBusquedaFicha').hide();
+        $('#tbodyResultadosFicha').empty();
+        $('#infoBienSeleccionado').addClass('d-none');
+        $('#mensajeErrorFicha').addClass('d-none');
+    });
+    
+    // Generar ficha
+    $('#btnGenerarFicha').on('click', function() {
+        const tipoFicha = $('#tipoFicha').val();
+        const bienId = $('#bienIdFicha').val();
+        const mensajeError = $('#mensajeErrorFicha');
+        
+        if (!tipoFicha) {
+            mensajeError.removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Por favor seleccione el tipo de ficha.');
+            return;
+        }
+        
+        if (!bienId) {
+            mensajeError.removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Por favor seleccione un bien.');
+            return;
+        }
+        
+        mensajeError.addClass('d-none');
+        
+        // Construir URL según el tipo de ficha
+        let url = '';
+        if (tipoFicha === 'computo') {
+            url = '/funciones/fichas/computo/' + bienId + '/';
+        } else if (tipoFicha === 'vehiculo') {
+            url = '/funciones/fichas/vehiculo/' + bienId + '/';
+        }
+        
+        if (!url) {
+            mensajeError.removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Error al construir la URL. Intente nuevamente.');
+            console.error('Error construyendo URL:', {tipoFicha, bienId});
+            return;
+        }
+        
+        console.log('Generando ficha:', {tipoFicha, bienId, url});
+        
+        // Abrir ficha en nueva pestaña
+        window.open(url, '_blank');
+    });
+    
+    function buscarBienesParaFicha(query, tipoFicha) {
+        $.ajax({
+            url: '{% url "inventario:buscar_bienes_para_ficha" %}',
+            method: 'GET',
+            data: {
+                'q': query,
+                'tipo': tipoFicha
+            },
+            success: function(response) {
+                const tbody = $('#tbodyResultadosFicha');
+                tbody.empty();
+                
+                if (response.bienes && response.bienes.length > 0) {
+                    $('#resultadosBusquedaFicha').show();
+                    response.bienes.forEach(function(bien) {
+                        const seriePlaca = tipoFicha === 'computo' ? (bien.serie || '-') : (bien.placa || '-');
+                        const row = `
+                            <tr style="cursor: pointer;" class="fila-bien-ficha" data-bien-id="${bien.id}" data-bien-nombre="${bien.descripcion || bien.denominacion || 'N/A'}">
+                                <td><strong>${bien.codigo_patrimonial || 'N/A'}</strong></td>
+                                <td>${bien.descripcion || bien.denominacion || 'N/A'}</td>
+                                <td>${bien.marca || '-'} ${bien.modelo || ''}</td>
+                                <td>${seriePlaca}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-success seleccionar-bien-ficha" data-bien-id="${bien.id}" data-bien-nombre="${bien.descripcion || bien.denominacion || 'N/A'}">
+                                        <i class="fas fa-check me-1"></i> Seleccionar
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.append(row);
+                    });
+                    
+                    // Agregar evento click a los botones usando delegación de eventos
+                    $(document).off('click', '.seleccionar-bien-ficha').on('click', '.seleccionar-bien-ficha', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const bienId = $(this).data('bien-id');
+                        const bienNombre = $(this).data('bien-nombre');
+                        console.log('Seleccionando bien:', {bienId, bienNombre});
+                        seleccionarBienFicha(bienId, bienNombre);
+                        return false;
+                    });
+                    
+                    // También permitir click en la fila completa
+                    $(document).off('click', '.fila-bien-ficha').on('click', '.fila-bien-ficha', function(e) {
+                        if (!$(e.target).closest('button').length) {
+                            e.preventDefault();
+                            const bienId = $(this).data('bien-id');
+                            const bienNombre = $(this).data('bien-nombre');
+                            console.log('Seleccionando bien desde fila:', {bienId, bienNombre});
+                            seleccionarBienFicha(bienId, bienNombre);
+                            return false;
+                        }
+                    });
+                } else {
+                    $('#resultadosBusquedaFicha').show();
+                    tbody.append('<tr><td colspan="5" class="text-center text-muted"><small>No se encontraron resultados</small></td></tr>');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error al buscar bienes:', error);
+                $('#mensajeErrorFicha').removeClass('d-none').html('<i class="fas fa-exclamation-triangle me-2"></i>Error al buscar bienes. Intente nuevamente.');
+            }
+        });
+    }
+    
+    function seleccionarBienFicha(bienId, bienNombre) {
+        $('#bienIdFicha').val(bienId);
+        $('#nombreBienSeleccionado').text(bienNombre);
+        $('#infoBienSeleccionado').removeClass('d-none');
+        $('#resultadosBusquedaFicha').hide();
+        $('#mensajeErrorFicha').addClass('d-none');
+        
+        // Scroll suave hacia el botón de generar
+        $('html, body').animate({
+            scrollTop: $('#infoBienSeleccionado').offset().top - 100
+        }, 500);
+    }
+    
+    // Permitir buscar con Enter
+    $('#buscarBienFicha').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const query = $(this).val().trim();
+            const tipoFicha = $('#tipoFicha').val();
+            if (query.length >= 2 && tipoFicha) {
+                buscarBienesParaFicha(query, tipoFicha);
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

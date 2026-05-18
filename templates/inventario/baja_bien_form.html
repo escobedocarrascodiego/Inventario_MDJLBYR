@@ -1,0 +1,379 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Registro de Baja de Bienes - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Registro de Baja de Bienes{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Registro de Baja de Bienes</h2>
+            <div>
+                <a href="{% url 'inventario:baja_bienes_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-list me-2"></i>Ver Bajas Registradas
+                </a>
+                <a href="{% url 'inventario:funciones_index' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-2"></i>Salir
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulario de Búsqueda -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-search me-2"></i>Parámetros de Búsqueda</h5>
+    </div>
+    <div class="card-body">
+        <form id="buscarBienForm">
+            {% csrf_token %}
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="id_tipo_busqueda" class="form-label">Búsqueda Por:</label>
+                    <select name="tipo_busqueda" id="id_tipo_busqueda" class="form-select" required>
+                        <option value="">Seleccione...</option>
+                        <option value="codigo_patrimonial">Código Patrimonial</option>
+                        <option value="codigo_interno">Código Interno</option>
+                        <option value="denominacion">Denominación</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="id_valor_busqueda" class="form-label">Valor de Búsqueda:</label>
+                    <input type="text" name="valor_busqueda" id="id_valor_busqueda" class="form-control" 
+                           placeholder="Ingrese el valor a buscar..." required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" id="btnBuscar" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>Buscar
+                    </button>
+                </div>
+            </div>
+        </form>
+        
+        <!-- Resultados de búsqueda -->
+        <div id="resultadosBusqueda" style="display: none;">
+            <hr>
+            <h6>Resultados de Búsqueda:</h6>
+            <div id="listaBienes" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                <!-- Los resultados se cargarán aquí via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Datos del Bien y Formulario de Baja -->
+<div class="card" id="datosBienCard" style="display: none;">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Datos del Tipo de Bien</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-12">
+                <form method="post" id="bajaForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="bien_id" id="bien_id_hidden">
+                    
+                    <!-- Datos del Bien (solo lectura) -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Denominación:</strong></label>
+                            <input type="text" class="form-control" id="denominacion" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Clase:</strong></label>
+                            <input type="text" class="form-control" id="clase" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Grupo Genérico:</strong></label>
+                            <input type="text" class="form-control" id="grupo_generico" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Cod. Patrimonial:</strong></label>
+                            <input type="text" class="form-control" id="codigo_patrimonial" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Código Interno:</strong></label>
+                            <input type="text" class="form-control" id="codigo_interno" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Tipo de Cuenta:</strong></label>
+                            <input type="text" class="form-control" id="tipo_cuenta" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Cta. Contable:</strong></label>
+                            <input type="text" class="form-control" id="cuenta_contable" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Forma de Adq.:</strong></label>
+                            <input type="text" class="form-control" id="forma_adquisicion" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Resol. Alta:</strong></label>
+                            <input type="text" class="form-control" id="resolucion_alta" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Fecha de Adq.:</strong></label>
+                            <input type="text" class="form-control" id="fecha_adquisicion" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Valor de Adq.:</strong></label>
+                            <input type="text" class="form-control" id="valor_adquisicion" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Valor Neto:</strong></label>
+                            <input type="text" class="form-control" id="valor_neto" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Estado del Bien:</strong></label>
+                            <input type="text" class="form-control" id="estado" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Usuario:</strong></label>
+                            <input type="text" class="form-control" id="usuario_asignado" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label"><strong>Local:</strong></label>
+                            <input type="text" class="form-control" id="local" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label"><strong>Area:</strong></label>
+                            <input type="text" class="form-control" id="area" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label"><strong>Oficina:</strong></label>
+                            <input type="text" class="form-control" id="oficina" readonly>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- ACTO DE BAJA -->
+                    <div class="border border-primary rounded p-3 mb-3" style="background-color: #f0f8ff;">
+                        <h5 class="text-primary mb-3"><i class="fas fa-exclamation-triangle me-2"></i>ACTO DE BAJA</h5>
+                        <div id="formularioBaja">
+                            <div class="alert alert-info">
+                                Seleccione un bien de los resultados de búsqueda para continuar.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" onclick="limpiarSeleccion()">
+                            <i class="fas fa-times me-2"></i>Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="btnGrabar" style="display: none;">
+                            <i class="fas fa-save me-2"></i>Grabar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let bienSeleccionado = null;
+
+$(document).ready(function() {
+    // Buscar al presionar el botón
+    $('#btnBuscar').on('click', function() {
+        buscarBienes();
+    });
+    
+    // Buscar al presionar Enter en el campo de búsqueda
+    $('#id_valor_busqueda').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            buscarBienes();
+        }
+    });
+    
+    // Si hay un bien cargado desde el servidor, mostrarlo
+    {% if bien %}
+    seleccionarBien({{ bien.id }});
+    {% endif %}
+});
+
+function buscarBienes() {
+    const tipo = $('#id_tipo_busqueda').val();
+    const valor = $('#id_valor_busqueda').val().trim();
+    
+    if (!tipo || !valor) {
+        alert('Por favor seleccione el tipo de búsqueda e ingrese un valor.');
+        return;
+    }
+    
+    if (valor.length < 2) {
+        alert('Ingrese al menos 2 caracteres para buscar.');
+        return;
+    }
+    
+    // Mostrar loading
+    $('#btnBuscar').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Buscando...');
+    $('#listaBienes').html('<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>');
+    $('#resultadosBusqueda').show();
+    
+    $.ajax({
+        url: '{% url "inventario:buscar_bien_ajax" %}',
+        method: 'GET',
+        data: {
+            'tipo_busqueda': tipo,
+            'valor_busqueda': valor
+        },
+        success: function(response) {
+            $('#btnBuscar').prop('disabled', false).html('<i class="fas fa-search me-2"></i>Buscar');
+            
+            if (response.bienes && response.bienes.length > 0) {
+                let html = '';
+                response.bienes.forEach(function(bien) {
+                    const badgeClass = bien.tiene_baja ? 'bg-danger' : 'bg-success';
+                    const badgeText = bien.tiene_baja ? 'Ya tiene baja' : 'Disponible';
+                    const disabled = bien.tiene_baja ? 'disabled' : '';
+                    
+                    html += `
+                        <a href="#" class="list-group-item list-group-item-action ${disabled}" 
+                           onclick="seleccionarBien(${bien.id}); return false;" ${disabled}>
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${bien.codigo_patrimonial} - ${bien.denominacion}</h6>
+                                <span class="badge ${badgeClass}">${badgeText}</span>
+                            </div>
+                            <p class="mb-1"><small>${bien.clase} | ${bien.local}</small></p>
+                        </a>
+                    `;
+                });
+                $('#listaBienes').html(html);
+            } else {
+                $('#listaBienes').html('<div class="alert alert-warning">No se encontraron bienes con los criterios de búsqueda.</div>');
+            }
+        },
+        error: function() {
+            $('#btnBuscar').prop('disabled', false).html('<i class="fas fa-search me-2"></i>Buscar');
+            $('#listaBienes').html('<div class="alert alert-danger">Error al realizar la búsqueda. Intente nuevamente.</div>');
+        }
+    });
+}
+
+function seleccionarBien(bienId) {
+    // Obtener datos completos del bien
+    const url = '{% url "inventario:obtener_bien_ajax" 999 %}'.replace('999', bienId);
+    $.ajax({
+        url: url,
+        method: 'GET',
+        success: function(bien) {
+            if (bien.tiene_baja) {
+                alert('Este bien ya tiene una baja registrada.');
+                return;
+            }
+            
+            bienSeleccionado = bien;
+            
+            // Llenar los campos del formulario
+            $('#bien_id_hidden').val(bien.id);
+            $('#denominacion').val(bien.denominacion);
+            $('#clase').val(bien.clase);
+            $('#grupo_generico').val(bien.grupo_generico);
+            $('#codigo_patrimonial').val(bien.codigo_patrimonial);
+            $('#codigo_interno').val(bien.codigo_interno);
+            $('#tipo_cuenta').val(bien.tipo_cuenta);
+            $('#cuenta_contable').val(bien.cuenta_contable);
+            $('#forma_adquisicion').val(bien.forma_adquisicion);
+            $('#resolucion_alta').val(bien.resolucion_alta);
+            $('#fecha_adquisicion').val(bien.fecha_adquisicion);
+            $('#valor_adquisicion').val('S/ ' + parseFloat(bien.valor_adquisicion).toFixed(2));
+            $('#valor_neto').val('S/ ' + parseFloat(bien.valor_neto).toFixed(2));
+            $('#estado').val(bien.estado);
+            $('#usuario_asignado').val(bien.usuario_asignado);
+            $('#local').val(bien.local);
+            $('#area').val(bien.area);
+            $('#oficina').val(bien.oficina);
+            
+            // Mostrar formulario de baja
+            const formularioBaja = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Resolución de Baja:</strong></label>
+                        <input type="text" name="resolucion_baja" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Fecha Resolución:</strong></label>
+                        <input type="date" name="fecha_resolucion" class="form-control" required>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Causal de Baja:</strong></label>
+                        <select name="causal_baja" class="form-select" required>
+                            <option value="">Seleccione...</option>
+                            <option value="DESTRUCCION_SINIESTRO">DESTRUCCIÓN O SINIESTRO</option>
+                            <option value="ENFERMEDAD_INCURABLE">ENFERMEDAD INCURABLE</option>
+                            <option value="ESTADO_EXCEDENCIA">ESTADO DE EXCEDENCIA</option>
+                            <option value="FALLECIMIENTO_MUERTE">FALLECIMIENTO O MUERTE</option>
+                            <option value="FALTANTE_SANEAMIENTO">FALTANTE - SANEAMIENTO</option>
+                            <option value="LESION_GRAVE">LESION GRAVE</option>
+                            <option value="MANTENIMIENTO_REPARACION">MANTENIMIENTO O REPARACIÓN ONEROSA</option>
+                            <option value="OBSOLENCIA_TECNICA">OBSOLENCIA TECNICA</option>
+                            <option value="PERDIDA_ROBO">PERDIDA: ROBO O SUSTRACCION</option>
+                            <option value="REEMBOLSO_REPOSICION">REEMBOLSO O REPOSICIÓN</option>
+                            <option value="OTRO_CAUSAL">OTRO CAUSAL</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Doc. SBN N°:</strong></label>
+                        <input type="text" name="documento_sbn" class="form-control">
+                    </div>
+                </div>
+            `;
+            $('#formularioBaja').html(formularioBaja);
+            $('#btnGrabar').show();
+            
+            // Mostrar la tarjeta de datos
+            $('#datosBienCard').slideDown();
+            
+            // Scroll a la tarjeta
+            $('html, body').animate({
+                scrollTop: $('#datosBienCard').offset().top - 100
+            }, 500);
+        },
+        error: function() {
+            alert('Error al obtener los datos del bien. Intente nuevamente.');
+        }
+    });
+}
+
+function limpiarSeleccion() {
+    bienSeleccionado = null;
+    $('#datosBienCard').slideUp();
+    $('#bien_id_hidden').val('');
+    $('#formularioBaja').html('<div class="alert alert-info">Seleccione un bien de los resultados de búsqueda para continuar.</div>');
+    $('#btnGrabar').hide();
+}
+</script>
+{% endblock %}

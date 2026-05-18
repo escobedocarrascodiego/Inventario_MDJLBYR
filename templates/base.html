@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Inventario Patrimonial{% endblock %}</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+
+    <style>
+        :root {
+            --sidebar-w: 260px;
+            --sidebar-bg: #0f172a;
+            --sidebar-border: rgba(255,255,255,.06);
+            --sidebar-hover: rgba(255,255,255,.07);
+            --sidebar-active: #3b82f6;
+            --topbar-h: 60px;
+            --body-bg: #f1f5f9;
+            --card-radius: .75rem;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--body-bg);
+            color: #1e293b;
+            margin: 0;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: var(--sidebar-w);
+            height: 100vh;
+            background: var(--sidebar-bg);
+            color: #cbd5e1;
+            z-index: 1040;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        .sidebar-brand {
+            padding: 1.25rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            border-bottom: 1px solid var(--sidebar-border);
+            flex-shrink: 0;
+        }
+        .sidebar-brand .brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border-radius: .5rem;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: .95rem;
+            flex-shrink: 0;
+        }
+        .sidebar-brand .brand-text {
+            font-size: .8rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            line-height: 1.3;
+        }
+        .sidebar-brand .brand-text small {
+            display: block;
+            font-weight: 400;
+            font-size: .65rem;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: .5rem 0;
+        }
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+
+        .nav-section {
+            padding: .75rem 1.25rem .35rem;
+            font-size: .65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #475569;
+        }
+
+        .nav-link-item {
+            display: flex;
+            align-items: center;
+            padding: .55rem 1.25rem;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 450;
+            transition: all .15s;
+            border-left: 3px solid transparent;
+            gap: .7rem;
+        }
+        .nav-link-item:hover {
+            color: #e2e8f0;
+            background: var(--sidebar-hover);
+        }
+        .nav-link-item.active {
+            color: #fff;
+            background: rgba(59,130,246,.12);
+            border-left-color: var(--sidebar-active);
+        }
+        .nav-link-item i {
+            width: 18px;
+            font-size: .85rem;
+            text-align: center;
+            opacity: .7;
+        }
+        .nav-link-item.active i { opacity: 1; color: var(--sidebar-active); }
+
+        .nav-sub-toggle {
+            cursor: pointer;
+        }
+        .nav-sub-toggle .chevron {
+            margin-left: auto;
+            font-size: .6rem;
+            transition: transform .25s;
+        }
+        .nav-sub-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+        .nav-submenu {
+            background: rgba(0,0,0,.15);
+        }
+        .nav-submenu .nav-link-item {
+            padding-left: 3rem;
+            font-size: .78rem;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-wrap {
+            margin-left: var(--sidebar-w);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            height: var(--topbar-h);
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.75rem;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+        }
+        .topbar-title {
+            font-size: .95rem;
+            font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+        .topbar .btn-toggle-sidebar {
+            display: none;
+            border: none;
+            background: none;
+            font-size: 1.15rem;
+            color: #475569;
+            padding: .25rem .5rem;
+            cursor: pointer;
+        }
+
+        .page-content {
+            flex: 1;
+            padding: 1.5rem 1.75rem 2rem;
+        }
+
+        /* ===== ALERTS ===== */
+        .alert {
+            border: none;
+            border-radius: var(--card-radius);
+            font-size: .85rem;
+        }
+
+        /* ===== CARDS (global) ===== */
+        .card {
+            border: 1px solid #e2e8f0;
+            border-radius: var(--card-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        }
+        .card-header {
+            border-radius: var(--card-radius) var(--card-radius) 0 0 !important;
+        }
+
+        /* ===== STAT CARD ===== */
+        .stat-card {
+            border: none;
+            border-radius: var(--card-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+            transition: transform .2s, box-shadow .2s;
+            overflow: hidden;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,.1);
+        }
+        .stat-card .card-body { padding: 1.35rem; }
+        .stat-card-icon {
+            font-size: 2rem;
+            opacity: .7;
+        }
+
+        /* ===== TABLE TWEAKS ===== */
+        .table { font-size: .85rem; }
+        .table thead th {
+            font-weight: 600;
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 991.98px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.show { transform: translateX(0); }
+            .main-wrap { margin-left: 0; }
+            .topbar .btn-toggle-sidebar { display: inline-flex; }
+            .page-content { padding: 1rem; }
+        }
+
+        /* ===== OVERLAY ===== */
+        .sidebar-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.4);
+            z-index: 1035;
+        }
+        .sidebar-overlay.show { display: block; }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Overlay for mobile sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon"><i class="fas fa-landmark"></i></div>
+            <div class="brand-text">
+                Inventario Patrimonial
+                <small>Sistema de Control de Bienes</small>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <!-- Principal -->
+            <div class="nav-section">Principal</div>
+            <a href="{% url 'inventario:home' %}" class="nav-link-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+            </a>
+            <!-- Recursos -->
+            <div class="nav-section">Recursos</div>
+            <a href="{% url 'inventario:bien_list' %}" class="nav-link-item {% if 'bien' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-box"></i><span>Bienes Patrimoniales</span>
+            </a>
+            <a href="{% url 'inventario:personal_list' %}" class="nav-link-item {% if 'personal' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-users"></i><span>Personal</span>
+            </a>
+            
+
+            <!-- Estructura Organizacional -->
+            <div class="nav-section">Organizaci&oacute;n</div>
+            <a href="{% url 'inventario:entidad_list' %}" class="nav-link-item {% if 'entidad' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-building"></i><span>Entidades</span>
+            </a>
+            <a href="{% url 'inventario:local_list' %}" class="nav-link-item {% if 'local' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-map-marker-alt"></i><span>Locales</span>
+            </a>
+            <a href="{% url 'inventario:area_list' %}" class="nav-link-item {% if 'area_' in request.resolver_match.url_name or request.resolver_match.url_name == 'area_list' %}active{% endif %}">
+                <i class="fas fa-sitemap"></i><span>&Aacute;reas</span>
+            </a>
+            <a href="{% url 'inventario:oficina_list' %}" class="nav-link-item {% if 'oficina' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-door-open"></i><span>Oficinas</span>
+            </a>
+            <a href="{% url 'inventario:ubicacionfisica_list' %}" class="nav-link-item {% if 'ubicacionfisica' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-map-pin"></i><span>Ubicaciones F&iacute;sicas</span>
+            </a>
+
+            
+            <!-- Catalogos -->
+            <div class="nav-section">Cat&aacute;logos</div>
+            <a href="#" class="nav-link-item nav-sub-toggle" data-bs-toggle="collapse" data-bs-target="#subCatalogos" aria-expanded="false">
+                <i class="fas fa-book"></i><span>Cat&aacute;logos de Bienes</span>
+                <i class="fas fa-chevron-down chevron"></i>
+            </a>
+            <div class="collapse nav-submenu" id="subCatalogos">
+                <a href="{% url 'inventario:grupogenerico_list' %}" class="nav-link-item {% if 'grupogenerico' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-layer-group"></i><span>Grupos Gen&eacute;ricos</span>
+                </a>
+                <a href="{% url 'inventario:clase_list' %}" class="nav-link-item {% if 'clase' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-folder"></i><span>Clases</span>
+                </a>
+                <a href="{% url 'inventario:denominacion_list' %}" class="nav-link-item {% if 'denominacion' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-tag"></i><span>Denominaciones</span>
+                </a>
+                <a href="{% url 'inventario:cuentacontable_list' %}" class="nav-link-item {% if 'cuentacontable' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-calculator"></i><span>Cuentas Contables</span>
+                </a>
+            </div>
+
+            <!-- Operaciones -->
+            <div class="nav-section">Operaciones</div>
+            <a href="{% url 'inventario:funciones_index' %}" class="nav-link-item {% if 'funciones' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-cogs"></i><span>Funciones</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main-wrap">
+        <header class="topbar">
+            <div class="topbar-title">
+                <button class="btn-toggle-sidebar" id="btnToggleSidebar" type="button">
+                    <i class="fas fa-bars"></i>
+                </button>
+                {% block page_title %}Dashboard{% endblock %}
+            </div>
+            <div class="topbar-actions">
+                {% if user.is_authenticated %}
+                    <span class="text-muted" style="font-size:.82rem;">
+                        <i class="fas fa-user-circle me-1"></i>
+                        <strong>{{ user.get_full_name|default:user.username }}</strong>
+                    </span>
+                    <a href="{% url 'admin:logout' %}" class="btn btn-outline-danger btn-sm" style="font-size:.78rem;">
+                        <i class="fas fa-sign-out-alt me-1"></i>Salir
+                    </a>
+                {% else %}
+                    <a href="{% url 'admin:login' %}" class="btn btn-primary btn-sm" style="font-size:.78rem;">
+                        <i class="fas fa-sign-in-alt me-1"></i>Iniciar Sesi&oacute;n
+                    </a>
+                {% endif %}
+            </div>
+        </header>
+
+        <main class="page-content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        (function(){
+            const btn = document.getElementById('btnToggleSidebar');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            function toggle(){
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            }
+            btn?.addEventListener('click', toggle);
+            overlay?.addEventListener('click', toggle);
+
+            // Auto-expand catalogos submenu if current link is active
+            const subCatalogos = document.getElementById('subCatalogos');
+            if(subCatalogos){
+                const hasActive = subCatalogos.querySelector('.nav-link-item.active');
+                if(hasActive){
+                    subCatalogos.classList.add('show');
+                    const toggler = document.querySelector('[data-bs-target="#subCatalogos"]');
+                    if(toggler) toggler.setAttribute('aria-expanded','true');
+                }
+            }
+        })();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-user me-2"></i>{{ title }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'inventario:personal_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>{{ action }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Cuando cambia el área, cargar las oficinas de esa área
+    $('#id_area').on('change', function() {
+        var areaId = $(this).val();
+        var oficinaSelect = $('#id_oficina');
+        
+        if (areaId) {
+            // Cargar oficinas del área seleccionada
+            $.ajax({
+                url: '{% url "inventario:obtener_oficinas_por_area" %}',
+                data: {
+                    'area_id': areaId
+                },
+                dataType: 'json',
+                success: function(data) {
+                    oficinaSelect.empty();
+                    oficinaSelect.append('<option value="">Seleccione una oficina (opcional)</option>');
+                    
+                    $.each(data.oficinas, function(i, oficina) {
+                        oficinaSelect.append(
+                            $('<option></option>')
+                                .attr('value', oficina.id)
+                                .text(oficina.nombre)
+                        );
+                    });
+                },
+                error: function() {
+                    alert('Error al cargar las oficinas.');
+                }
+            });
+        } else {
+            // Si no hay área seleccionada, limpiar oficinas
+            oficinaSelect.empty();
+            oficinaSelect.append('<option value="">Seleccione una oficina (opcional)</option>');
+        }
+    });
+});
+</script>
+{% endblock %}

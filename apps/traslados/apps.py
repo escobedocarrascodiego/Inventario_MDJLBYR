@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class TrasladosConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'traslados'
+    verbose_name = 'Traslados de Bienes'

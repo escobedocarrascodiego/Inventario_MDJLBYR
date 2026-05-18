@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Funciones - Sistema de Inventario Patrimonial{% endblock %}
+
+{% block page_title %}Funciones{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-2">Módulo de Funciones</h2>
+        <p class="text-muted">Seleccione una función para realizar operaciones sobre los bienes patrimoniales</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Generación de Reportes -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                </div>
+                <h5 class="card-title mb-3">Reportes en general</h5>
+                <p class="card-text text-muted mb-4">
+                    Genere reportes detallados de bienes patrimoniales en formato PDF para documentación oficial.
+                </p>
+                <a href="{% url 'inventario:reportes_index' %}" class="btn btn-danger btn-sm">
+                    <i class="fas fa-file-pdf me-2"></i>Generar Reporte
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generación de Etiquetas -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-tags fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title mb-3">Generación de Etiquetas</h5>
+                <p class="card-text text-muted mb-4">
+                    Genere etiquetas con códigos patrimoniales para identificar físicamente los bienes.
+                </p>
+                <a href="{% url 'inventario:etiquetas_index' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-tags me-2"></i>Generar Etiquetas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Baja de Bienes -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-trash-alt fa-3x text-danger"></i>
+                </div>
+                <h5 class="card-title mb-3">Baja de Bienes</h5>
+                <p class="card-text text-muted mb-4">
+                    Registre la baja de bienes patrimoniales con documentación y justificación correspondiente.
+                </p>
+                <a href="{% url 'inventario:baja_bien_create' %}" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash-alt me-2"></i>Registrar Baja
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Traslado de Bienes -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-exchange-alt fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title mb-3">Traslado de Bienes</h5>
+                <p class="card-text text-muted mb-4">
+                    Registre el traslado de bienes entre oficinas, áreas o personal responsable.
+                </p>
+                <a href="{% url 'inventario:traslado_bienes_index' %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-exchange-alt me-2"></i>Registrar Traslado
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Escanear Códigos de Barras -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-barcode fa-3x text-info"></i>
+                </div>
+                <h5 class="card-title mb-3">Escanear Códigos de Barras</h5>
+                <p class="card-text text-muted mb-4">
+                    Escanee códigos patrimoniales y traslade bienes por lote a un usuario y ubicación destino.
+                </p>
+                <a href="{% url 'inventario:escanear_codigos_barras' %}" class="btn btn-info btn-sm text-white">
+                    <i class="fas fa-barcode me-2"></i>Escanear
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Consulta Histórica -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-clock fa-3x text-secondary"></i>
+                </div>
+                <h5 class="card-title mb-3">Consulta Histórica</h5>
+                <p class="card-text text-muted mb-4">
+                    Calcule el valor neto histórico de los bienes patrimoniales por fecha de corte.
+                </p>
+                <a href="{% url 'inventario:consulta_historica' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-history me-2"></i>Consultar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cierre de Año Fiscal -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-lock fa-3x text-dark"></i>
+                </div>
+                <h5 class="card-title mb-3">Cierre de Año Fiscal</h5>
+                <p class="card-text text-muted mb-4">
+                    Genere el cierre anual para congelar la data histórica del inventario patrimonial.
+                </p>
+                <a href="{% url 'inventario:cierre_anio_fiscal' %}" class="btn btn-dark btn-sm">
+                    <i class="fas fa-lock me-2"></i>Ir al Cierre
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carga Masiva -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-file-csv fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title mb-3">Carga Masiva</h5>
+                <p class="card-text text-muted mb-4">
+                    Importe bienes desde un archivo CSV para cargar el inventario masivamente.
+                </p>
+                <a href="{% url 'inventario:importar_inventario' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-upload me-2"></i>Importar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

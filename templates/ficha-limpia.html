@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ficha de Asignación</title>
+  <style>
+    /* 1. CONFIGURACIÓN DE PÁGINA HORIZONTAL */
+    @page {
+        size: A4 landscape;
+        margin: 0.8cm;
+    }
+
+    * { box-sizing: border-box; }
+    
+    body { 
+        font-family: Arial, sans-serif; 
+        font-size: 10px;
+        color: #231F1F; 
+    }
+    
+    /* Estilos específicos para campos destacados - tamaño mucho mayor para xhtml2pdf */
+    .campo-destacado-texto {
+        font-size: 18pt !important;
+        font-weight: normal !important;
+        line-height: 1.2 !important;
+        display: inline-block !important;
+    }
+
+    /* ESTILOS DE TABLAS */
+    table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-bottom: 0.5rem;         
+    }
+
+    /* BORDES Y ALINEACIÓN DE CELDAS */
+    th, td { 
+        border: 1px solid #231F1F; 
+        padding: 4px; 
+        vertical-align: middle; /* CLAVE: Esto centra verticalmente */
+    }
+
+    /* CABECERA GRIS */
+    thead th { 
+        background: #DEDDDE; 
+        font-weight: bold; 
+        text-align: center; 
+    }
+
+    /* === TRUCO PARA EL ANCHO DEL 60% (TABLA MAESTRA) === */
+    .layout-table {
+        width: 100%;
+        border: none;
+        margin-bottom: 10px;
+    }
+    .layout-table td {
+        border: none;
+        padding: 0 6px;
+        vertical-align: top;
+    }
+    .layout-table td:first-child {
+        padding-left: 0;
+        padding-right: 6px;
+    }
+    .layout-table td:last-child {
+        padding-right: 0;
+        padding-left: 6px;
+    }
+    
+    /* TABLA DATOS USUARIO (origen/destino) - xhtml2pdf: tamaños solo en pt y una clase por regla */
+    .tabla-datos {
+        width: 100%;
+        border: 1px solid #231F1F;
+        font-size: 10pt;
+    }
+    /* Altura fija por fila para que ambas tablas queden alineadas como espejo */
+    .tabla-datos tbody tr {
+        height: 26px;
+    }
+    .tabla-datos thead tr {
+        height: 26px;
+    }
+    /* Etiquetas (th): un solo tamaño explícito en pt para que xhtml2pdf no lo ignore */
+    .tabla-datos th {
+        text-align: left;
+        width: 25%;
+        background: #DEDDDE;
+        vertical-align: middle;
+        font-size: 10pt !important;
+        font-weight: bold !important;
+        padding-left: 8px;
+    }
+    /* Título de sección (solo el encabezado "USUARIO DE ORIGEN/DESTINO") */
+    .tabla-datos .titulo-seccion-usuario {
+        font-size: 11pt !important;
+        font-weight: bold !important;
+    }
+    .tabla-datos td {
+        text-align: left;
+        vertical-align: middle;
+        font-size: 10pt !important;
+        padding-left: 12px;
+        text-indent: 4px;
+    }
+    
+    /* TABLA 2: DESCRIPCIÓN - ESTILOS COMPATIBLES CON xhtml2pdf */
+    .tabla-descripcion { 
+        width: 100%; 
+        table-layout: fixed !important; 
+        border-collapse: collapse;
+    }
+    
+    /* Forzar anchos usando colgroup - xhtml2pdf respeta mejor esto */
+    .tabla-descripcion col.n-orden { width: 1.2cm !important; }
+    .tabla-descripcion col.codigo { width: 2.8cm !important; }
+    .tabla-descripcion col.denom { width: 6.2cm !important; }
+    .tabla-descripcion col.marca { width: 2.2cm !important; }
+    .tabla-descripcion col.modelo { width: 2.2cm !important; }
+    .tabla-descripcion col.color { width: 1.7cm !important; }
+    .tabla-descripcion col.serie { width: 2.8cm !important; }
+    .tabla-descripcion col.otros { width: 1.7cm !important; }
+    .tabla-descripcion col.estado { width: 1.7cm !important; }
+    .tabla-descripcion col.obs { width: 5.6cm !important; }
+    
+    .tabla-descripcion th { 
+        text-align: center; 
+        vertical-align: middle; 
+        padding: 4px;
+        -pdf-keep-in-frame-mode: shrink;
+        -pdf-word-wrap: CJK;
+    }
+    .tabla-descripcion td { 
+        vertical-align: middle; 
+        padding: 4px; 
+        -pdf-keep-in-frame-mode: shrink;
+        -pdf-word-wrap: CJK;
+    }
+    
+    /* Anchos específicos para cada columna - usando anchos absolutos */
+    .tabla-descripcion .n-orden,
+    .tabla-descripcion th.n-orden,
+    .tabla-descripcion td.n-orden { 
+        width: 1.2cm !important; 
+        max-width: 1.2cm !important;
+        min-width: 1.2cm !important;
+        text-align: center; 
+    }
+    .tabla-descripcion .codigo,
+    .tabla-descripcion th.codigo,
+    .tabla-descripcion td.codigo { 
+        width: 2.8cm !important; 
+        max-width: 2.8cm !important;
+        min-width: 2.8cm !important;
+        text-align: center; 
+    }
+    .tabla-descripcion .denom,
+    .tabla-descripcion th.denom,
+    .tabla-descripcion td.denom { 
+        width: 6.2cm !important; 
+        max-width: 6.2cm !important;
+        min-width: 6.2cm !important;
+    }
+    .tabla-descripcion .marca,
+    .tabla-descripcion th.marca,
+    .tabla-descripcion td.marca { 
+        width: 2.2cm !important; 
+        max-width: 2.2cm !important;
+        min-width: 2.2cm !important;
+    }
+    .tabla-descripcion .modelo,
+    .tabla-descripcion th.modelo,
+    .tabla-descripcion td.modelo { 
+        width: 2.2cm !important; 
+        max-width: 2.2cm !important;
+        min-width: 2.2cm !important;
+    }
+    .tabla-descripcion .color,
+    .tabla-descripcion th.color,
+    .tabla-descripcion td.color { 
+        width: 1.7cm !important; 
+        max-width: 1.7cm !important;
+        min-width: 1.7cm !important;
+        font-size: 8px !important;
+        -pdf-word-wrap: CJK;
+    }
+    .tabla-descripcion .serie,
+    .tabla-descripcion th.serie,
+    .tabla-descripcion td.serie { 
+        width: 2.8cm !important; 
+        max-width: 2.8cm !important;
+        min-width: 2.8cm !important;
+    }
+    .tabla-descripcion .otros,
+    .tabla-descripcion th.otros,
+    .tabla-descripcion td.otros { 
+        width: 1.7cm !important; 
+        max-width: 1.7cm !important;
+        min-width: 1.7cm !important;
+        text-align: center; 
+    }
+    .tabla-descripcion .estado,
+    .tabla-descripcion th.estado,
+    .tabla-descripcion td.estado { 
+        width: 1.7cm !important; 
+        max-width: 1.7cm !important;
+        min-width: 1.7cm !important;
+        text-align: center; 
+    }
+    .tabla-descripcion .obs,
+    .tabla-descripcion th.obs,
+    .tabla-descripcion td.obs { 
+        width: 5.6cm !important; 
+        max-width: 5.6cm !important;
+        min-width: 5.6cm !important;
+    }
+
+
+    /* CABECERA DOCUMENTO */
+    .doc-header { text-align: center; margin-bottom: 0.5rem; }
+    .doc-header .anexo { font-size: 8px; font-weight: bold; margin-bottom: 2px; }
+    .doc-header h1 { font-size: 11px; font-weight: bold; margin: 0; }
+
+    /* ENTIDAD */
+    .entidad-block { margin-bottom: 0.5rem; font-size: 9px; border: none; }
+    .entidad-block td { border: none; padding: 2px; }
+
+    /* FIRMAS (ESTILOS NUEVOS) */
+    .firmas-table { 
+        width: 100%; 
+        margin-top: 30px; 
+        border: none; 
+    }
+    .firmas-table td { 
+        border: none; 
+        text-align: center; 
+        vertical-align: top; 
+    }
+    /* Tabla interna para línea de firma (compatible con xhtml2pdf) */
+    .firma-linea-table {
+        width: 200px;
+        margin: 0 auto;
+        border-collapse: collapse;
+    }
+    .firma-linea-table td {
+        border: none;
+        padding: 0;
+    }
+    .firma-linea {
+        border-bottom: 1px solid #000;
+        height: 14px;
+    }
+    .firma-text-line {
+        font-family: monospace;
+        font-size: 10px;
+        letter-spacing: 1px;
+        line-height: 14px;
+    }
+    .texto-firma {
+        font-weight: bold;
+        font-size: 9px;
+        padding-top: 4px;
+    }
+
+    /* TEXTOS */
+    .notas { margin: 0.5rem 0; font-size: 8px; }
+    .consideraciones { margin: 0.5rem 0; font-size: 8px; }
+    .consideraciones h3 { font-size: 9px; text-decoration: underline; margin: 0 0 2px 0; }
+    .consideraciones ul { margin: 0; padding-left: 1.5rem; }
+  </style>
+</head>
+<body>
+
+  <div class="doc-header">
+    <p class="anexo">ANEXO N.° 03</p>
+    <h1>FORMATO DE DESPLAZAMIENTO INTERNO DE BIENES MUEBLES PATRIMONIALES</h1>
+  </div>
+
+  <table class="entidad-block">
+    <tr>
+        <td style="text-align: left;">
+            <strong>ENTIDAD U ORGANIZACIÓN DE LA ENTIDAD:</strong><br>
+            {{ entidad_nombre|default:"Municipalidad Distrital de José Luis Bustamante y Rivero" }}
+        </td>
+        <td style="text-align: right; vertical-align: bottom;">
+            <strong>FECHA:</strong> {{ fecha|default:"" }}
+        </td>
+    </tr>
+  </table>
+
+  <table class="layout-table">
+    <tr>
+      <td style="width: 50%;">
+        <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th colspan="4" class="titulo-seccion-usuario" style="text-align: left; padding-left: 8px; font-size: 11pt !important;">USUARIO DE ORIGEN <small>(donde pertenecía el bien)</small></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Nombres y apellidos</th>
+                <td>{{ nombres_completos_origen|default:"" }}</td>
+                <th style="width: 15%;">N° DNI</th>
+                <td>{{ dni_origen|default:"" }}</td>
+              </tr>
+              <tr>
+                <th>Correo electrónico</th>
+                <td colspan="3">{{ correo_origen|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Órgano o U. Orgánica</th>
+                <td colspan="3">{{ oficina_origen|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Local o sede</th>
+                <td colspan="3">{{ local_origen|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Dirección <small>(1)</small></th>
+                <td colspan="3">{{ direccion_origen|default:"-" }}</td>
+              </tr>
+            </tbody>
+          </table>
+      </td>
+      <td style="width: 50%;">
+        <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th colspan="4" class="titulo-seccion-usuario" style="text-align: left; padding-left: 8px; font-size: 11pt !important;">USUARIO DE DESTINO <small>(a quien se asigna el bien)</small></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Nombres y apellidos</th>
+                <td>{{ nombres_completos_destino|default:"" }}</td>
+                <th style="width: 15%;">N° DNI</th>
+                <td>{{ dni_destino|default:"" }}</td>
+              </tr>
+              <tr>
+                <th>Correo electrónico</th>
+                <td colspan="3">{{ correo_destino|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Órgano o U. Orgánica</th>
+                <td colspan="3">{{ oficina_destino|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Local o sede</th>
+                <td colspan="3">{{ local_destino|default:"-" }}</td>
+              </tr>
+              <tr>
+                <th>Dirección <small>(1)</small></th>
+                <td colspan="3">{{ direccion_destino|default:"-" }}</td>
+              </tr>
+            </tbody>
+          </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="tabla-descripcion" repeat="1">
+    <colgroup>
+      <col class="n-orden" style="width: 1.2cm;">
+      <col class="codigo" style="width: 2.8cm;">
+      <col class="denom" style="width: 6.2cm;">
+      <col class="marca" style="width: 2.2cm;">
+      <col class="modelo" style="width: 2.2cm;">
+      <col class="color" style="width: 1.7cm;">
+      <col class="serie" style="width: 2.8cm;">
+      <col class="otros" style="width: 1.7cm;">
+      <col class="estado" style="width: 1.7cm;">
+      <col class="obs" style="width: 5.6cm;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th rowspan="2" class="n-orden" style="width: 1.2cm; max-width: 1.2cm;">N° DE ORDEN</th>
+        <th colspan="8">DESCRIPCIÓN <small>(2)</small></th>
+        <th rowspan="2" class="obs" style="width: 5.6cm; max-width: 5.6cm;">OBSERVACIONES</th>
+      </tr>
+      <tr>
+        <th class="codigo" style="width: 2.8cm; max-width: 2.8cm;">CÓDIGO PATRIMONIAL</th>
+        <th class="denom" style="width: 6.2cm; max-width: 6.2cm;">DENOMINACIÓN</th>
+        <th class="marca" style="width: 2.2cm; max-width: 2.2cm;">MARCA</th>
+        <th class="modelo" style="width: 2.2cm; max-width: 2.2cm;">MODELO</th>
+        <th class="color" style="width: 1.7cm; max-width: 1.7cm; font-size: 8px;">COLOR</th>
+        <th class="serie" style="width: 2.8cm; max-width: 2.8cm;">SERIE</th>
+        <th class="otros" style="width: 1.7cm; max-width: 1.7cm;">OTROS</th>
+        <th class="estado" style="width: 1.7cm; max-width: 1.7cm;">ESTADO <small>(3)</small></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in traslados_unicos %}
+      <tr>
+        <td class="n-orden" style="width: 1.2cm; max-width: 1.2cm; min-width: 1.2cm;">{{ forloop.counter }}</td>
+        <td class="codigo" style="width: 2.8cm; max-width: 2.8cm; min-width: 2.8cm;">{{ item.bien.codigo_patrimonial|default:"" }}</td>
+        <td class="denom" style="width: 6.2cm; max-width: 6.2cm; min-width: 6.2cm;">
+            {% if item.bien.denominacion %}
+                {{ item.bien.denominacion.nombre }}
+            {% else %}
+                {{ item.bien.descripcion|default:"" }}
+            {% endif %}
+        </td>
+        <td class="marca" style="width: 2.2cm; max-width: 2.2cm; min-width: 2.2cm;">{{ item.bien.marca|default:"" }}</td>
+        <td class="modelo" style="width: 2.2cm; max-width: 2.2cm; min-width: 2.2cm;">{{ item.bien.modelo|default:"" }}</td>
+        <td class="color" style="width: 1.7cm; max-width: 1.7cm; min-width: 1.7cm; font-size: 8px; -pdf-word-wrap: CJK;">{{ item.bien.color|default:"" }}</td>
+        <td class="serie" style="width: 2.8cm; max-width: 2.8cm; min-width: 2.8cm;">{{ item.bien.serie|default:"" }}</td>
+        <td class="otros" style="width: 1.7cm; max-width: 1.7cm; min-width: 1.7cm;">{{ item.bien.otros_detalles|default:"" }}</td>
+        <td class="estado" style="width: 1.7cm; max-width: 1.7cm; min-width: 1.7cm;">{{ item.bien.get_estado_display }}</td>
+        <td class="obs" style="width: 5.6cm; max-width: 5.6cm; min-width: 5.6cm;">{{ item.observaciones|default:"" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+          <td colspan="10" style="text-align: center; padding: 10px;">Sin bienes asignados</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <section class="notas">
+    <p><strong>(1)</strong> Se consigna para el caso de entrega o devolución de bienes muebles patrimoniales para teletrabajo.</p>
+    <p><strong>(2)</strong> En caso de vehículos, se utiliza adicionalmente el Formato de Ficha Técnica de Vehículo, contemplado en el Anexo N°08.</p>
+    <p><strong>(3)</strong> El estado es consignado en base a la siguiente escala: nuevo, bueno, regular o malo.</p>
+  </section>
+
+  <section class="consideraciones">
+    <h3>CONSIDERACIONES:</h3>
+    <ul>
+      <li>El usuario es responsable de la permanencia y conservación de cada uno de los bienes descritos, recomiéndese tomar las precauciones del caso para evitar sustracciones, deterioros, etc.</li>
+      <li>Cualquier necesidad de traslado del bien mueble patrimonial dentro o fuera del local de la Entidad u Organización de la Entidad, es previamente comunicado al encargado de la OCP.</li>
+    </ul>
+  </section>
+
+  <table class="firmas-table">
+    <tr>
+        <td>
+            <div style="height: 50px;"></div>
+            <table class="firma-linea-table">
+                <tr><td class="firma-linea"><span class="firma-text-line">________________________</span></td></tr>
+                <tr><td class="texto-firma">Firma del Transferente</td></tr>
+            </table>
+        </td>
+        <td>
+            <div style="height: 50px;"></div>
+            <table class="firma-linea-table">
+                <tr><td class="firma-linea"><span class="firma-text-line">________________________</span></td></tr>
+                <tr><td class="texto-firma">Firma del Receptor</td></tr>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+             <div style="height: 40px;"></div>
+             <table class="firma-linea-table">
+                <tr><td class="firma-linea"><span class="firma-text-line">________________________</span></td></tr>
+                <tr><td class="texto-firma">Personal de la OCP</td></tr>
+            </table>
+        </td>
+    </tr>
+  </table>
+
+</body>
+</html>
