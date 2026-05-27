@@ -14,7 +14,11 @@
       "Bash(git commit -m 'Initial commit: Sistema de Inventario Patrimonial MDJLBYR *)",
       "Bash(git push *)",
       "Bash(./venv/Scripts/python.exe manage.py check)",
-      "Bash(./venv/Scripts/python.exe -c ' *)"
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(dir D:\\\\Programación\\\\Inventario_MDJLBYR)",
+      "Bash(./venv/Scripts/python.exe manage.py migrate traslados)",
+      "Bash(./venv/Scripts/python.exe manage.py showmigrations traslados)",
+      "Bash(./venv/Scripts/python.exe manage.py migrate traslados 0001 --fake)"
     ]
   }
 }

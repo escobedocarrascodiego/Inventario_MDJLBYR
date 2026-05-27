@@ -70,9 +70,15 @@
                         <option value="">Seleccione...</option>
                     </select>
                 </div>
-                
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Documento que autoriza el Traslado:</strong></label>
+                    <input type="text" id="documento_autoriza" class="form-control"
+                           placeholder="Ej: Informe 115/2026" maxlength="255">
+                </div>
+
                 <hr>
-                
+
                 <h6 class="mb-2">Bienes Disponibles:</h6>
                 <div class="mb-2">
                     <input type="text" id="searchBienesOrigen" class="form-control form-control-sm"
@@ -822,6 +828,7 @@ function ejecutarTraslado() {
             'area_destino_id': $('#area_destino').val() || '',
             'oficina_destino_id': $('#oficina_destino').val() || '',
             'ubicacion_destino_id': $('#ubicacion_destino').val() || '',
+            'documento_autoriza': $('#documento_autoriza').val() || '',
             'observaciones': ''
         }),
         success: function(response) {
@@ -855,6 +862,7 @@ function limpiarFormulario() {
     $('#oficina_destino').html('<option value="">Seleccione...</option>');
     $('#ubicacion_destino').html('<option value="">Seleccione...</option>');
     $('#searchBienesOrigen').val('');
+    $('#documento_autoriza').val('');
     filtroBienesOrigen = '';
     bienesOrigen = [];
     bienesDestino = [];

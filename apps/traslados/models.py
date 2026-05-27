@@ -25,6 +25,9 @@ class TrasladoBien(models.Model):
     oficina_destino = models.ForeignKey('organizacion.Oficina', on_delete=models.PROTECT, related_name='traslados_destino', null=True, blank=True, verbose_name="Oficina Destino")
     ubicacion_destino = models.ForeignKey('organizacion.UbicacionFisica', on_delete=models.PROTECT, related_name='traslados_destino_ubicacion', null=True, blank=True, verbose_name="Ubicación Física Destino")
     
+    # Documento que autoriza el traslado (Informe, Memorando, etc.)
+    documento_autoriza = models.CharField(max_length=255, blank=True, null=True, verbose_name="Documento que autoriza el Traslado")
+
     # Auditoría
     fecha_traslado = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Traslado")
     usuario_registro = models.CharField(max_length=100, blank=True, null=True, verbose_name="Usuario que registró")

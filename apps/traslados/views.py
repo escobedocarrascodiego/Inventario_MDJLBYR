@@ -413,8 +413,9 @@ def ejecutar_traslado(request):
         area_destino_id = data.get('area_destino_id')
         oficina_destino_id = data.get('oficina_destino_id')
         ubicacion_destino_id = data.get('ubicacion_destino_id')
+        documento_autoriza = (data.get('documento_autoriza') or '').strip()
         observaciones = data.get('observaciones', '')
-        
+
         if not bienes_ids:
             return JsonResponse({'success': False, 'error': 'Debe seleccionar al menos un bien para trasladar.'})
         
@@ -458,12 +459,13 @@ def ejecutar_traslado(request):
                     area_destino=area_destino,
                     oficina_destino=oficina_destino,
                     ubicacion_destino=ubicacion_destino,
+                    documento_autoriza=documento_autoriza,
                     observaciones=observaciones
                 )
                 # Forzar el mismo timestamp para todo el lote
                 traslado.fecha_traslado = batch_time
                 traslado.save(update_fields=['fecha_traslado'])
-                
+
                 # Actualizar el bien
                 bien.usuario_asignado = usuario_destino
                 bien.local = local_destino
@@ -564,6 +566,7 @@ def generar_reporte_asignacion_traslado(request, traslado_id):
 
     context = {
         'entidad_nombre': entidad_nombre,
+        'documento_autoriza': traslado.documento_autoriza or '',
         'fecha': fecha_traslado_str,
         'nombres_completos_origen': nombres_completos_origen,
         'dni_origen': dni_origen,
