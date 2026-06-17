@@ -41,7 +41,15 @@ class ParametroSistema(models.Model):
         config = cls.objects.filter(anio_fiscal=year).first()
         if config:
             return config
-        return cls.objects.order_by('anio_fiscal').first()
+        # Fallback: si no existe fila para el año exacto, se devuelve la del año
+        # MÁS CERCANO disponible (menor |anio_fiscal - year|). En empate de distancia
+        # gana el año menor (más antiguo). NO se usa la fila activa (es_activo) ni la
+        # más reciente: para el umbral de 1/4 UIT interesa la UIT histórica más próxima
+        # al año de adquisición del bien.
+        disponibles = list(cls.objects.all())
+        if not disponibles:
+            return None
+        return min(disponibles, key=lambda c: (abs(c.anio_fiscal - year), c.anio_fiscal))
 
     class Meta:
         ordering = ['-anio_fiscal']
@@ -115,16 +123,15 @@ class Bien(models.Model):
     ]
     estado = models.CharField(max_length=15, choices=ESTADO_BIEN, default='BUENO')
 
-    # --- Situación Administrativa ---
+    # --- Situación (Uso / Desuso) ---
     SITUACION_CHOICES = [
-        ('NORMAL', 'Normal'),
-        ('SOBRANTE', 'Sobrante'),
-        ('FALTANTE', 'Faltante'),
+        ('USO', 'En Uso'),
+        ('DESUSO', 'En Desuso'),
     ]
     situacion = models.CharField(
         max_length=10,
         choices=SITUACION_CHOICES,
-        default='NORMAL',
+        default='USO',
         verbose_name="Situación"
     )
     
@@ -160,10 +167,29 @@ class Bien(models.Model):
     # Ej: {"procesador": "i7", "ram": "16GB"}
     otros_detalles = models.TextField(blank=True, null=True, help_text="Especificaciones adicionales en formato texto")
 
+    def _fecha_inicio_depreciacion(self):
+        """Fecha desde la que se cuenta la depreciación.
+        COALESCE(fecha_pecosa, fecha_adquisicion): la PECOSA (puesta en uso) tiene
+        prioridad; si no existe se usa la fecha de adquisición. Si faltan ambas,
+        devuelve None y el bien no se deprecia. (CAMBIO 3)"""
+        return self.fecha_pecosa or self.fecha_adquisicion
+
+    def _anio_base_umbral(self):
+        """Año cuya UIT se usa para el umbral de 1/4 UIT (Directiva 005-2016-EF/51.01):
+        el año de ADQUISICIÓN del bien. Si no hay fecha_adquisicion se usa el año de la
+        PECOSA. Si faltan ambas devuelve None (no se puede depreciar). (CAMBIO 1)"""
+        if self.fecha_adquisicion:
+            return self.fecha_adquisicion.year
+        if self.fecha_pecosa:
+            return self.fecha_pecosa.year
+        return None
+
     def _meses_transcurridos_desde_pecosa(self, fecha_corte=None):
-        if not self.fecha_pecosa:
+        # La depreciación arranca en COALESCE(fecha_pecosa, fecha_adquisicion). (CAMBIO 3)
+        fecha_inicio = self._fecha_inicio_depreciacion()
+        if not fecha_inicio:
             return 0
-        inicio_mes_siguiente = (self.fecha_pecosa.replace(day=1) + relativedelta(months=1))
+        inicio_mes_siguiente = (fecha_inicio.replace(day=1) + relativedelta(months=1))
         corte = fecha_corte.date() if hasattr(fecha_corte, 'date') else fecha_corte
         if corte is None:
             corte = timezone.now().date()
@@ -172,37 +198,77 @@ class Bien(models.Model):
         delta = relativedelta(corte, inicio_mes_siguiente)
         return (delta.years * 12) + delta.months
 
-    def valor_neto_en(self, fecha_corte=None):
-        if not self.fecha_pecosa:
-            return self.valor_adquisicion
+    def calcular_depreciacion(self, fecha_corte=None):
+        """FUENTE ÚNICA del cálculo de depreciación (Directiva N° 005-2016-EF/51.01).
 
+        Devuelve un dict con todos los componentes para que el modelo, el reporte PDF
+        y el Excel reutilicen la misma lógica sin duplicar fórmulas. Claves:
+          depreciable (bool), motivo_no_depreciable (str|None), fecha_inicio (date|None),
+          anio_base_uit (int|None), umbral (Decimal|None), tasa (Decimal|None),
+          meses (int), cuota_mensual (Decimal), depreciacion_acumulada (Decimal),
+          valor_neto (Decimal).
+        """
         corte = fecha_corte.date() if hasattr(fecha_corte, 'date') else fecha_corte
         if corte is None:
             corte = timezone.now().date()
 
-        config = ParametroSistema.get_config_for_year(corte.year)
+        fecha_inicio = self._fecha_inicio_depreciacion()
+        anio_base = self._anio_base_umbral()
+        resultado = {
+            'depreciable': False,
+            'motivo_no_depreciable': None,
+            'fecha_inicio': fecha_inicio,
+            'anio_base_uit': anio_base,
+            'umbral': None,
+            'tasa': None,
+            'meses': 0,
+            'cuota_mensual': Decimal('0.00'),
+            'depreciacion_acumulada': Decimal('0.00'),
+            'valor_neto': self.valor_adquisicion,
+        }
+
+        # Sin fecha de inicio (ni PECOSA ni adquisición) no se puede depreciar. (CAMBIO 3)
+        if fecha_inicio is None or anio_base is None:
+            resultado['motivo_no_depreciable'] = 'Sin fecha de adquisición ni PECOSA'
+            return resultado
+
+        # --- Umbral de 1/4 UIT con la UIT del AÑO DE ADQUISICIÓN (CAMBIO 1) ---
+        config = ParametroSistema.get_config_for_year(anio_base)
         valor_uit = config.valor_uit if config else Decimal('5500.00')
-        divisor_umbral = config.divisor_umbral_depreciacion if config else 4
-        if not divisor_umbral:
-            divisor_umbral = 4
-        umbral_depreciacion = valor_uit / Decimal(str(divisor_umbral))
+        divisor_umbral = (config.divisor_umbral_depreciacion if config else 4) or 4
+        umbral = valor_uit / Decimal(str(divisor_umbral))
+        resultado['umbral'] = umbral
+        if self.valor_adquisicion <= umbral:
+            resultado['motivo_no_depreciable'] = f'≤ 1/4 UIT del año {anio_base}'
+            return resultado
 
-        if self.valor_adquisicion <= umbral_depreciacion:
-            return self.valor_adquisicion
-
+        # --- Tasa (NO usa UIT; idéntico a antes) ---
         tasa = self.tasa_depreciacion
         if tasa is None and self.cuenta_contable:
             tasa = self.cuenta_contable.tasa_depreciacion
-
         if not tasa:
-            return self.valor_adquisicion
+            resultado['motivo_no_depreciable'] = 'Sin tasa de depreciación'
+            return resultado
+        resultado['tasa'] = tasa
 
-        meses_transcurridos = self._meses_transcurridos_desde_pecosa(corte)
-        depreciacion_mensual = (self.valor_adquisicion * (tasa / 100)) / 12
-        depreciacion_mensual = depreciacion_mensual.quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-        depreciacion_acumulada = depreciacion_mensual * meses_transcurridos
-        valor_neto = self.valor_adquisicion - depreciacion_acumulada
-        return max(valor_neto, Decimal('1.00'))
+        # --- Depreciación lineal con piso de S/ 1.00 (idéntico a antes) ---
+        meses = self._meses_transcurridos_desde_pecosa(corte)
+        cuota_mensual = (self.valor_adquisicion * (tasa / 100)) / 12
+        cuota_mensual = cuota_mensual.quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
+        valor_neto = max(self.valor_adquisicion - cuota_mensual * meses, Decimal('1.00'))
+        # La acumulada se acota al piso para que (acumulada + valor_neto) = adquisición.
+        depreciacion_acumulada = self.valor_adquisicion - valor_neto
+        resultado.update({
+            'depreciable': True,
+            'meses': meses,
+            'cuota_mensual': cuota_mensual,
+            'depreciacion_acumulada': depreciacion_acumulada,
+            'valor_neto': valor_neto,
+        })
+        return resultado
+
+    def valor_neto_en(self, fecha_corte=None):
+        return self.calcular_depreciacion(fecha_corte)['valor_neto']
 
     @property
     def valor_neto_actualizado(self):
@@ -269,6 +335,16 @@ class Bien(models.Model):
             models.Index(fields=['fecha_adquisicion']),
             models.Index(fields=['cuenta_contable']),
             models.Index(fields=['usuario_asignado']),
+            # Índice de COBERTURA para el reporte por cuentas contables.
+            # El GROUP BY por cuenta_contable con SUM(valor_adquisicion/valor_neto)
+            # se resuelve leyendo solo este índice (estrecho) en vez de escanear
+            # toda la tabla de bienes (que tiene 30+ columnas). 'estado' permite
+            # excluir las bajas y el id (PK) ya viene incluido para el COUNT.
+            models.Index(
+                fields=['cuenta_contable', 'estado'],
+                include=['valor_adquisicion', 'valor_neto'],
+                name='bien_cuenta_cob_idx',
+            ),
         ]
 
 

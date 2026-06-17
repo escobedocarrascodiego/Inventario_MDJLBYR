@@ -435,9 +435,11 @@ def importar_inventario_view(request):
             if estado_val not in dict(Bien.ESTADO_BIEN):
                 estado_val = 'BUENO'
 
-            situacion_val = (_valor('situacion', row) or 'NORMAL').upper()
-            if situacion_val not in dict(Bien.SITUACION_CHOICES):
-                situacion_val = 'NORMAL'
+            situacion_val = (_valor('situacion', row) or 'USO').upper()
+            if 'DESUSO' in situacion_val:
+                situacion_val = 'DESUSO'
+            elif situacion_val not in dict(Bien.SITUACION_CHOICES):
+                situacion_val = 'USO'
 
             anio_fabricacion_val = _valor('anio_fabricacion', row)
             anio_fabricacion = int(anio_fabricacion_val) if anio_fabricacion_val.isdigit() else None
@@ -1073,28 +1075,47 @@ def buscar_bien_ajax(request):
 
 @require_http_methods(["GET"])
 def buscar_bien_etiquetas(request):
-    """Vista AJAX para buscar bienes en generación de etiquetas"""
+    """Vista AJAX para buscar bienes en generación de etiquetas.
+
+    Optimización: cuando la búsqueda parece un código patrimonial (empieza por
+    dígito) se usa ``istartswith``, que es "sargable" en SQL Server y aprovecha
+    el índice de ``codigo_patrimonial`` en lugar de hacer un LIKE '%...%' con
+    comodín inicial (que fuerza un escaneo completo de la tabla). La búsqueda por
+    nombre se resuelve contra el catálogo de denominaciones (tabla pequeña).
+    """
     query = request.GET.get('q', '').strip()
-    
+
     if len(query) < 2:
         return JsonResponse({'results': []})
-    
-    bienes = Bien.objects.exclude(estado='BAJA').select_related('denominacion')
-    bienes = bienes.filter(
-        Q(codigo_patrimonial__icontains=query) |
-        Q(descripcion__icontains=query) |
-        Q(denominacion__nombre__icontains=query)
+
+    # Mismo patrón que la lista de Bienes Patrimoniales (que carga al instante):
+    # - SIN select_related / SIN JOINs durante el filtrado.
+    # - Se busca en la columna denormalizada 'descripcion' (que ya está en la
+    #   tabla Bien y se auto-rellena desde la denominación), evitando el JOIN a
+    #   la tabla de denominaciones.
+    # - Se traen solo las columnas necesarias con .values() y se limita a 20.
+    codigo_normalizado = query.replace('.', '').replace('-', '').replace(' ', '')
+    if codigo_normalizado.isdigit():
+        # Búsqueda por código: istartswith es "sargable" y usa el índice.
+        filtro = Q(codigo_patrimonial__istartswith=query)
+        if codigo_normalizado != query:
+            filtro |= Q(codigo_patrimonial__istartswith=codigo_normalizado)
+    else:
+        # Búsqueda por nombre directamente sobre la tabla Bien (sin JOIN).
+        filtro = Q(descripcion__icontains=query)
+
+    bienes = Bien.objects.exclude(estado='BAJA').filter(filtro).values(
+        'id', 'codigo_patrimonial', 'descripcion'
     ).order_by('codigo_patrimonial')[:20]
-    
-    results = []
-    for bien in bienes:
-        codigo = bien.codigo_patrimonial or 'N/A'
-        nombre = bien.denominacion.nombre if bien.denominacion else bien.descripcion or 'N/A'
-        results.append({
-            'id': bien.id,
-            'text': f"{codigo} - {nombre}"
-        })
-    
+
+    results = [
+        {
+            'id': bien['id'],
+            'text': f"{bien['codigo_patrimonial'] or 'N/A'} - {bien['descripcion'] or 'N/A'}"
+        }
+        for bien in bienes
+    ]
+
     return JsonResponse({'results': results})
 
 

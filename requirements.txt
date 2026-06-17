@@ -31,6 +31,9 @@ pillow==12.1.1
 # --- Excel (importación/exportación) ---
 openpyxl==3.1.5
 
+# --- Impresión directa a impresora USB/local en Windows (etiquetas Zebra ZPL) ---
+pywin32==312; sys_platform == "win32"
+
 # --- Utilidades de fechas ---
 python-dateutil==2.9.0.post0
 

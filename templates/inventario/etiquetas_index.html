@@ -31,9 +31,16 @@
                 <p><strong>Formato de Etiqueta:</strong></p>
                 <ul class="small">
                     <li>Logo a la izquierda</li>
-                    <li>Código QR a la derecha</li>
-                    <li>Información del bien en el centro</li>
+                    <li>Código QR con el código patrimonial</li>
+                    <li>Información del bien al costado</li>
                     <li>Año seleccionable</li>
+                </ul>
+                <hr>
+                <p class="small mb-1"><strong>Impresora Zebra (ZPL):</strong></p>
+                <ul class="small">
+                    <li>Imprime <strong>2 etiquetas por fila</strong> (5 × 2.5 cm).</li>
+                    <li>Sale directo a la impresora USB instalada en Windows.</li>
+                    <li>Si la impresora no responde, se descarga un archivo <code>.zpl</code>.</li>
                 </ul>
                 <hr>
                 <p class="small text-muted">
@@ -50,26 +57,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoGeneracion = document.getElementById('id_tipo_generacion');
     const campoAño = document.getElementById('campo-año');
     const campoBien = document.getElementById('campo-bien');
+    const campoUsuario = document.getElementById('campo-usuario');
     const campoLocal = document.getElementById('campo-local');
     const campoArea = document.getElementById('campo-area');
     const campoOficina = document.getElementById('campo-oficina');
     const campoAñoAdquisicion = document.getElementById('campo-año-adquisicion');
-    
-    const bienSearch = document.getElementById('bien-search');
-    const bienSelect = document.getElementById('id_bien');
-    
+
     function toggleCampos() {
         // Ocultar todos los campos primero
         campoBien.style.display = 'none';
+        campoUsuario.style.display = 'none';
         campoLocal.style.display = 'none';
         campoArea.style.display = 'none';
         campoOficina.style.display = 'none';
         campoAñoAdquisicion.style.display = 'none';
-        
+
         // Mostrar el campo según la selección
         const valor = tipoGeneracion.value;
         if (valor === 'bien_especifico') {
             campoBien.style.display = 'block';
+        } else if (valor === 'por_usuario') {
+            campoUsuario.style.display = 'block';
         } else if (valor === 'por_local') {
             campoLocal.style.display = 'block';
         } else if (valor === 'por_area') {
@@ -80,74 +88,93 @@ document.addEventListener('DOMContentLoaded', function() {
             campoAñoAdquisicion.style.display = 'block';
         }
     }
-    
-    function debounce(fn, delay) {
-        let timer = null;
-        return function(...args) {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn.apply(this, args), delay);
-        };
-    }
-    
-    function setBienOptions(results) {
-        if (!bienSelect) {
+
+    // Vincula un input + botón "Buscar" con un <select> dinámico que se llena
+    // vía AJAX. La búsqueda se dispara SOLO al pulsar el botón o Enter (no en
+    // cada tecla), para no saturar la base de datos con consultas.
+    // Reutilizable para "Bien específico" y "Por usuario".
+    function configurarBuscador(inputId, buttonId, selectId, placeholderText) {
+        const searchInput = document.getElementById(inputId);
+        const searchBtn = document.getElementById(buttonId);
+        const selectEl = document.getElementById(selectId);
+        if (!searchInput || !selectEl) {
             return;
         }
-        const currentValue = bienSelect.value;
-        const currentText = bienSelect.options[bienSelect.selectedIndex]?.text || '';
-        bienSelect.innerHTML = '';
-        
-        const placeholder = new Option('Seleccione un bien', '', true, false);
-        placeholder.disabled = true;
-        if (currentValue) {
-            placeholder.selected = false;
-        }
-        bienSelect.add(placeholder);
-        
-        const added = new Set();
-        if (currentValue) {
-            const opt = new Option(currentText || 'Bien seleccionado', currentValue, true, true);
-            bienSelect.add(opt);
-            added.add(String(currentValue));
-        }
-        
-        results.forEach(item => {
-            const key = String(item.id);
-            if (added.has(key)) {
+
+        function setOptions(results) {
+            selectEl.innerHTML = '';
+
+            const placeholder = new Option(placeholderText, '', true, false);
+            placeholder.disabled = true;
+            selectEl.add(placeholder);
+
+            if (!results.length) {
+                const vacio = new Option('Sin resultados', '', false, false);
+                vacio.disabled = true;
+                selectEl.add(vacio);
                 return;
             }
-            const opt = new Option(item.text, item.id, false, false);
-            bienSelect.add(opt);
+
+            const added = new Set();
+            results.forEach(item => {
+                const key = String(item.id);
+                if (added.has(key)) {
+                    return;
+                }
+                const opt = new Option(item.text, item.id, false, false);
+                selectEl.add(opt);
+                added.add(key);
+            });
+            // Si solo hay una coincidencia, seleccionarla automáticamente.
+            // Si hay varias, dejar que el usuario elija para no equivocarse.
+            if (added.size === 1) {
+                selectEl.selectedIndex = 1;
+            }
+        }
+
+        async function buscar() {
+            const query = searchInput.value.trim();
+            if (query.length < 2) {
+                searchInput.focus();
+                return;
+            }
+            const url = selectEl.getAttribute('data-ajax-url') || '';
+            const textoOriginal = searchBtn ? searchBtn.innerHTML : '';
+            if (searchBtn) {
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Buscando...';
+            }
+            try {
+                const response = await fetch(`${url}?q=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    return;
+                }
+                const data = await response.json();
+                setOptions(data.results || []);
+            } catch (error) {
+                // Silencio intencional: evita romper el formulario por fallos de red
+            } finally {
+                if (searchBtn) {
+                    searchBtn.disabled = false;
+                    searchBtn.innerHTML = textoOriginal;
+                }
+            }
+        }
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', buscar);
+        }
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();  // Evita que se envíe el formulario
+                buscar();
+            }
         });
     }
-    
-    async function buscarBienes(query) {
-        if (!bienSelect) {
-            return;
-        }
-        if (query.length < 2) {
-            setBienOptions([]);
-            return;
-        }
-        const url = bienSelect.getAttribute('data-ajax-url') || '';
-        try {
-            const response = await fetch(`${url}?q=${encodeURIComponent(query)}`);
-            if (!response.ok) {
-                return;
-            }
-            const data = await response.json();
-            setBienOptions(data.results || []);
-        } catch (error) {
-            // Silencio intencional: evita romper el formulario por fallos de red
-        }
-    }
-    
-    if (bienSearch) {
-        bienSearch.addEventListener('input', debounce((e) => {
-            buscarBienes(e.target.value.trim());
-        }, 300));
-    }
-    
+
+    configurarBuscador('bien-search', 'bien-search-btn', 'id_bien', 'Seleccione un bien');
+    configurarBuscador('usuario-search', 'usuario-search-btn', 'id_usuario', 'Seleccione un usuario');
+
     tipoGeneracion.addEventListener('change', toggleCampos);
     toggleCampos(); // Ejecutar al cargar la página
 });

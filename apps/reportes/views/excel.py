@@ -69,9 +69,17 @@ def generar_reporte_excel_bienes_detallados(request):
         'Número Motor',
         'Número Chasis',
         'Año Fabricación',
-        'Otros Detalles'
+        'Otros Detalles',
+        # --- Detalle de depreciación (CAMBIO 6, calculado por el modelo) ---
+        'Tasa Depreciación (%)',
+        'Fecha Inicio Depreciación',
+        'Meses Depreciados',
+        'Depreciación del Ejercicio (Mensual)',
+        'Depreciación Acumulada',
+        'Valor Neto (Calculado)',
+        '¿Depreciable?'
     ]
-    
+
     # Escribir encabezados
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num)
@@ -81,8 +89,21 @@ def generar_reporte_excel_bienes_detallados(request):
         cell.alignment = center_alignment
         cell.border = border_style
     
+    # Corte = hoy para el snapshot de depreciación (fuente única: modelo). (CAMBIO 6)
+    fecha_corte = datetime.now().date()
+
     # Escribir datos
     for row_num, bien in enumerate(bienes, 2):
+        # Cálculo de depreciación con la MISMA lógica del modelo (sin reimplementar fórmula)
+        dep = bien.calcular_depreciacion(fecha_corte)
+        fecha_inicio_dep = dep['fecha_inicio'].strftime('%d/%m/%Y') if dep['fecha_inicio'] else 'N/A'
+        if dep['depreciable']:
+            depreciable_txt = 'Sí'
+        else:
+            motivo = dep['motivo_no_depreciable']
+            depreciable_txt = f"No ({motivo})" if motivo else 'No'
+        tasa_pct = float(dep['tasa']) if dep['tasa'] is not None else 0.0
+
         # Obtener datos relacionados
         denominacion_nombre = bien.denominacion.nombre if bien.denominacion else bien.descripcion or 'N/A'
         grupo_generico = bien.denominacion.grupo_generico.nombre if bien.denominacion and bien.denominacion.grupo_generico else bien.grupo_generico or 'N/A'
@@ -117,7 +138,7 @@ def generar_reporte_excel_bienes_detallados(request):
             fecha_adq,
             bien.resolucion_alta or 'N/A',
             float(bien.valor_adquisicion),
-            float(bien.valor_neto),
+            float(dep['valor_neto']),  # CAMBIO 6a: ahora usa el método del modelo
             bien.get_estado_display(),
             usuario_nombre,
             usuario_doc,
@@ -135,20 +156,33 @@ def generar_reporte_excel_bienes_detallados(request):
             bien.numero_motor or 'N/A',
             bien.numero_chasis or 'N/A',
             bien.anio_fabricacion or 'N/A',
-            bien.otros_detalles or 'N/A'
+            bien.otros_detalles or 'N/A',
+            # --- Detalle de depreciación (CAMBIO 6) ---
+            tasa_pct,                              # 31 Tasa Depreciación (%)
+            fecha_inicio_dep,                      # 32 Fecha Inicio Depreciación
+            dep['meses'],                          # 33 Meses Depreciados
+            float(dep['cuota_mensual']),           # 34 Depreciación del Ejercicio (Mensual)
+            float(dep['depreciacion_acumulada']),  # 35 Depreciación Acumulada
+            float(dep['valor_neto']),              # 36 Valor Neto (Calculado)
+            depreciable_txt                        # 37 ¿Depreciable?
         ]
-        
+
         # Escribir fila
         for col_num, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num)
             cell.value = value
             cell.border = border_style
             cell.alignment = left_alignment
-            
+
             # Formato especial para columnas numéricas
-            if col_num in [11, 12]:  # Valor de Adquisición y Valor Neto
+            if col_num in [11, 12, 34, 35, 36]:  # Valores monetarios
                 cell.number_format = '#,##0.00'
                 cell.alignment = Alignment(horizontal='right', vertical='center')
+            elif col_num == 31:  # Tasa (%)
+                cell.number_format = '0.00'
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+            elif col_num == 33:  # Meses (entero)
+                cell.alignment = center_alignment
     
     # Ajustar ancho de columnas
     column_widths = {
@@ -182,6 +216,13 @@ def generar_reporte_excel_bienes_detallados(request):
         'AB': 20,  # Número Chasis
         'AC': 15,  # Año Fabricación
         'AD': 40,  # Otros Detalles
+        'AE': 18,  # Tasa Depreciación (%)
+        'AF': 20,  # Fecha Inicio Depreciación
+        'AG': 16,  # Meses Depreciados
+        'AH': 22,  # Depreciación del Ejercicio (Mensual)
+        'AI': 20,  # Depreciación Acumulada
+        'AJ': 18,  # Valor Neto (Calculado)
+        'AK': 28,  # ¿Depreciable?
     }
     
     for col, width in column_widths.items():

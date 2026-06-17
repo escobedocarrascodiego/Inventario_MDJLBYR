@@ -2,6 +2,7 @@ from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Submit, HTML, Div
 from organizacion.models import UbicacionFisica, Oficina, Local, Area
+from personal.models import Personal
 from .models import Bien
 
 
@@ -229,16 +230,30 @@ class EtiquetaFiltroForm(forms.Form):
     TIPO_GENERACION = [
         ('todos', 'Todos los Bienes Activos'),
         ('bien_especifico', 'Bien Específico'),
+        ('por_usuario', 'Por Usuario Asignado'),
         ('por_local', 'Por Local'),
         ('por_area', 'Por Área'),
         ('por_oficina', 'Por Oficina'),
         ('por_año', 'Por Año de Adquisición'),
     ]
     
+    FORMATO_SALIDA = [
+        ('zebra_zpl', 'Impresora Zebra ZT411 (ZPL)'),
+        ('pdf', 'PDF'),
+    ]
+
     tipo_generacion = forms.ChoiceField(
         choices=TIPO_GENERACION,
         label="Tipo de Generación",
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo_generacion'})
+    )
+
+    formato = forms.ChoiceField(
+        choices=FORMATO_SALIDA,
+        initial='zebra_zpl',
+        label="Formato de salida",
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_formato'}),
+        help_text="ZPL imprime directo en la Zebra; PDF para vista/impresión común."
     )
     
     año = forms.IntegerField(
@@ -263,7 +278,17 @@ class EtiquetaFiltroForm(forms.Form):
             'data-ajax-url': '/ajax/buscar-bien-etiquetas/'
         })
     )
-    
+
+    usuario = forms.ChoiceField(
+        required=False,
+        label="Usuario Asignado",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_usuario',
+            'data-ajax-url': '/ajax/anexo03/buscar-personal/'
+        })
+    )
+
     local = forms.ModelChoiceField(
         queryset=Local.objects.all(),
         required=False,
@@ -308,11 +333,24 @@ class EtiquetaFiltroForm(forms.Form):
                 nombre = bien.denominacion.nombre if bien.denominacion else bien.descripcion or 'N/A'
                 choices.append((str(bien.id), f"{codigo} - {nombre}"))
         self.fields['bien'].choices = choices
+
+        # Precargar la opción del usuario seleccionado para que el ChoiceField
+        # valide correctamente el valor enviado vía AJAX (Select dinámico).
+        usuario_id = (self.data.get('usuario') or self.initial.get('usuario') or '').strip()
+        usuario_choices = [('', 'Seleccione un usuario')]
+        if usuario_id.isdigit():
+            persona = Personal.objects.filter(id=int(usuario_id)).first()
+            if persona:
+                etiqueta = f"{persona.apellidos}, {persona.nombres} — DNI: {persona.numero_documento}"
+                usuario_choices.append((str(persona.id), etiqueta))
+        self.fields['usuario'].choices = usuario_choices
+
         self.helper = FormHelper()
         self.helper.layout = Layout(
             HTML('<h5 class="mb-3">Configuración de Generación de Etiquetas</h5>'),
             Row(
-                Column('tipo_generacion', css_class='col-md-12'),
+                Column('tipo_generacion', css_class='col-md-6'),
+                Column('formato', css_class='col-md-6'),
             ),
             HTML('<div id="campo-año" class="mt-3">'),
             Row(
@@ -324,14 +362,37 @@ class EtiquetaFiltroForm(forms.Form):
                 Column(
                     HTML(
                         '<label class="form-label" for="bien-search">Buscar bien</label>'
+                        '<div class="input-group">'
                         '<input type="text" id="bien-search" class="form-control" '
-                        'placeholder="Buscar por código o nombre">'
+                        'placeholder="Buscar por código o nombre" autocomplete="off">'
+                        '<button type="button" id="bien-search-btn" class="btn btn-primary">'
+                        '<i class="fas fa-search me-1"></i>Buscar</button>'
+                        '</div>'
                     ),
                     css_class='col-md-12'
                 ),
             ),
             Row(
                 Column('bien', css_class='col-md-12 mt-2'),
+            ),
+            HTML('</div>'),
+            HTML('<div id="campo-usuario" class="mt-3" style="display: none;">'),
+            Row(
+                Column(
+                    HTML(
+                        '<label class="form-label" for="usuario-search">Buscar usuario</label>'
+                        '<div class="input-group">'
+                        '<input type="text" id="usuario-search" class="form-control" '
+                        'placeholder="Buscar por apellidos, nombres o DNI" autocomplete="off">'
+                        '<button type="button" id="usuario-search-btn" class="btn btn-primary">'
+                        '<i class="fas fa-search me-1"></i>Buscar</button>'
+                        '</div>'
+                    ),
+                    css_class='col-md-12'
+                ),
+            ),
+            Row(
+                Column('usuario', css_class='col-md-12 mt-2'),
             ),
             HTML('</div>'),
             HTML('<div id="campo-local" class="mt-3" style="display: none;">'),
@@ -371,6 +432,17 @@ class EtiquetaFiltroForm(forms.Form):
         if not bien:
             raise forms.ValidationError("Seleccione un bien válido.")
         return bien
+
+    def clean_usuario(self):
+        usuario_id = (self.cleaned_data.get('usuario') or '').strip()
+        if not usuario_id:
+            return None
+        if not usuario_id.isdigit():
+            raise forms.ValidationError("Seleccione un usuario válido.")
+        persona = Personal.objects.filter(id=int(usuario_id)).first()
+        if not persona:
+            raise forms.ValidationError("Seleccione un usuario válido.")
+        return persona
 
 
 # ==============================================================================

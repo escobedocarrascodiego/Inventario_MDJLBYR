@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-wmhcvb0rcg(v7ugj0&afrzz7)0_ort(cly*4o$+9kzy7a10l^w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -144,3 +144,36 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+
+# =============================================================
+# Impresora de etiquetas Zebra ZT411 (ZPL)
+# =============================================================
+# El sistema decide cómo imprimir en este orden de prioridad:
+#   1) ZEBRA_PRINTER_NAME  -> impresora USB/local instalada en Windows (recomendado).
+#      Es el nombre EXACTO que aparece en "Dispositivos e impresoras"
+#      (ej: 'ZDesigner ZT411-203dpi ZPL'). Imprime directo con un clic.
+#   2) ZEBRA_PRINTER_IP    -> impresora en red por el puerto raw 9100.
+#   3) Si ninguno está definido (o si fallan), descarga un archivo .zpl que
+#      puedes previsualizar en http://labelary.com/viewer.html o enviar con
+#      Zebra Setup Utilities.
+ZEBRA_PRINTER_NAME = ''      # Vacío: imprime por red (IP). Ponlo solo si usas USB local.
+ZEBRA_PRINTER_IP = '10.0.1.252'   # IP de la ZT411 en la red (impresión desde cualquier PC)
+ZEBRA_PRINTER_PORT = 9100    # Puerto raw estándar de Zebra
+ZEBRA_PRINTER_DPI = 203      # Resolución del cabezal: 203, 300 o 600 (la ZT411 estándar es 203)
+# Oscuridad del cabezal (0 a 30). Como enviamos ZPL crudo, la impresora IGNORA
+# la "Oscuridad" del driver de Windows: hay que fijarla aquí. Súbela si la
+# impresión sale clara; bájala si las letras se manchan o se corren.
+ZEBRA_PRINTER_DARKNESS = 30
+# Velocidad de impresión en mm/s (None = no tocar). Imprimir más lento también
+# oscurece. La ZT411 admite 51, 76, 102, 127, 152, etc.
+ZEBRA_PRINTER_SPEED = None
+
+# Geometría física del rollo de etiquetas (en milímetros).
+# El rollo viene con varias etiquetas por fila (columnas). Cada avance del
+# papel imprime una fila completa de etiquetas.
+ZEBRA_LABEL_COLUMNAS = 2     # Cuántas etiquetas hay lado a lado en el rollo
+ZEBRA_LABEL_ANCHO_MM = 50    # Ancho de cada etiqueta (5 cm)
+ZEBRA_LABEL_ALTO_MM = 25     # Alto de cada etiqueta (2.5 cm)
+ZEBRA_LABEL_GAP_MM = 2       # Separación horizontal entre columnas (ajústalo si descuadra)
+ZEBRA_LABEL_MARGEN_IZQ_MM = 5.0  # Margen izquierdo del logo/QR (súbelo si salen cortados)

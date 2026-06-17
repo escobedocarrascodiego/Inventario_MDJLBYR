@@ -18,6 +18,8 @@ from reportlab.pdfgen import canvas
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import os
+from io import BytesIO
+from PIL import Image as PILImage
 from organizacion.models import Local, Area, Oficina
 from catalogos.models import CuentaContable, Denominacion
 from bienes.models import Bien, ParametroSistema
@@ -72,12 +74,9 @@ def generar_reporte_depreciacion(request):
 
     bienes = bienes.order_by('codigo_patrimonial')
 
-    config = ParametroSistema.get_current_config()
-    valor_uit = config.valor_uit if config else Decimal('5500.00')
-    divisor_umbral = config.divisor_umbral_depreciacion if config else 4
-    if not divisor_umbral:
-        divisor_umbral = 4
-    umbral_depreciacion = valor_uit / Decimal(str(divisor_umbral))
+    # Fuente ÚNICA de verdad: el cálculo vive en el modelo (Bien.calcular_depreciacion).
+    # Corte = hoy para el snapshot del reporte. (CAMBIO 2)
+    fecha_corte = date.today()
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_depreciacion_{}.pdf"'.format(
@@ -127,26 +126,19 @@ def generar_reporte_depreciacion(request):
     ]]
 
     for bien in bienes:
-        tasa = bien.tasa_depreciacion
-        if tasa is None and bien.cuenta_contable:
-            tasa = bien.cuenta_contable.tasa_depreciacion
-
-        if not tasa or bien.valor_adquisicion <= umbral_depreciacion:
+        dep = bien.calcular_depreciacion(fecha_corte)  # fuente única (CAMBIO 2)
+        if not dep['depreciable']:
             dep_anual = Decimal('0.00')
             dep_mensual = Decimal('0.00')
             dep_acumulada = Decimal('0.00')
-            valor_neto = bien.valor_adquisicion
+            valor_neto = dep['valor_neto']
             tasa_display = '0.00'
         else:
-            dep_anual = (bien.valor_adquisicion * (tasa / 100)).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-            dep_mensual = (dep_anual / 12).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-            meses_transcurridos = bien._meses_transcurridos_desde_pecosa()
-            dep_acumulada = (dep_mensual * Decimal(str(meses_transcurridos))).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-            max_depreciacion = (bien.valor_adquisicion - Decimal('1.00')).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-            if dep_acumulada > max_depreciacion:
-                dep_acumulada = max_depreciacion
-            valor_neto = (bien.valor_adquisicion - dep_acumulada).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP)
-            tasa_display = f"{tasa:.2f}"
+            dep_mensual = dep['cuota_mensual']
+            dep_anual = dep_mensual * 12
+            dep_acumulada = dep['depreciacion_acumulada']
+            valor_neto = dep['valor_neto']
+            tasa_display = f"{dep['tasa']:.2f}"
 
         descripcion = bien.denominacion.nombre if bien.denominacion else (bien.descripcion or '')
 
@@ -189,12 +181,14 @@ def generar_reporte_bienes_activos(request):
     """Genera un reporte PDF detallado de todos los bienes activos con formato estructurado"""
     from reportlab.platypus import KeepTogether
     
-    # Obtener todos los bienes activos (excluyendo los dados de baja)
-    bienes = Bien.objects.exclude(estado='BAJA').select_related(
-        'denominacion', 'denominacion__grupo_generico', 'denominacion__clase',
-        'cuenta_contable', 'usuario_asignado', 'usuario_asignado__area', 'usuario_asignado__area__local',
-        'usuario_asignado__oficina', 'local', 'local__entidad', 'area', 'oficina'
-    ).order_by('codigo_patrimonial')
+    # Obtener todos los bienes activos (excluyendo los dados de baja).
+    # Se hace select_related SOLO de las relaciones que realmente se usan en el
+    # PDF y se materializa en lista para no repetir la consulta en .count()/.exists()
+    # (cada repetición era un viaje extra al servidor SQL remoto).
+    bienes = list(Bien.objects.exclude(estado='BAJA').select_related(
+        'denominacion', 'cuenta_contable', 'usuario_asignado',
+        'local', 'area', 'oficina'
+    ).order_by('codigo_patrimonial'))
     
     # Crear respuesta HTTP con tipo PDF
     response = HttpResponse(content_type='application/pdf')
@@ -354,9 +348,9 @@ def generar_reporte_bienes_activos(request):
     elements.append(Spacer(1, 0.3*cm))
     
     # ===== CUERPO: BIENES DETALLADOS =====
-    total_bienes = bienes.count()
-    
-    if bienes.exists():
+    total_bienes = len(bienes)
+
+    if bienes:
         for idx, bien in enumerate(bienes, 1):
             # Obtener datos
             codigo_patrimonial = bien.codigo_patrimonial or 'N/A'
@@ -382,25 +376,12 @@ def generar_reporte_bienes_activos(request):
             # Construir la tabla principal del bien
             bien_table_data = []
             
-            # Primera fila: número, códigos y denominación
-            # Crear número en una tabla pequeña con borde
-            num_table = Table(
-                [[Paragraph(f"{idx}", ParagraphStyle('NumStyle', parent=styles['Normal'], fontSize=9, 
-                                                    fontName='Helvetica-Bold', alignment=TA_CENTER))]],
-                colWidths=[0.6*cm]
-            )
-            num_table.setStyle(TableStyle([
-                ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 2),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ]))
-            
+            # Primera fila: número, códigos y denominación.
+            # El número va directo en la celda (sin tabla anidada) para acelerar el
+            # render de ReportLab cuando hay miles de bienes.
             bien_table_data.append([
-                num_table,
+                Paragraph(f"{idx}", ParagraphStyle('NumStyle', parent=styles['Normal'], fontSize=9,
+                                                   fontName='Helvetica-Bold', alignment=TA_CENTER)),
                 Paragraph(f"COD. PATRIMONIAL: {codigo_patrimonial}", value_style),
                 Paragraph(f"COD. INT.: {codigo_interno}", value_style),
                 Paragraph(f"DENOMINACION: {denominacion}", value_style)
@@ -458,6 +439,7 @@ def generar_reporte_bienes_activos(request):
             bien_table = Table(bien_table_data, colWidths=[0.8*cm, 8.5*cm, 3*cm, 5.7*cm])
             bien_table.setStyle(TableStyle([
                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
+                ('BOX', (0, 0), (0, 0), 0.5, colors.grey),  # Recuadro del número
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # Número centrado
                 ('ALIGN', (1, 0), (-1, 0), 'LEFT'),  # Primera fila a la izquierda
@@ -611,13 +593,17 @@ def generar_reporte_bienes_por_local(request):
 
 def generar_reporte_bienes_baja(request):
     """Genera un reporte PDF detallado de todos los bienes dados de baja"""
-    # Obtener todos los bienes dados de baja con sus datos de baja
-    bienes = Bien.objects.filter(estado='BAJA').select_related(
-        'denominacion', 'denominacion__grupo_generico', 'denominacion__clase',
-        'cuenta_contable', 'usuario_asignado', 'usuario_asignado__area', 
-        'usuario_asignado__area__local', 'usuario_asignado__oficina',
+    # Obtener todos los bienes dados de baja con sus datos de baja.
+    # Se materializa una sola vez y se hace select_related solo de lo que se usa,
+    # evitando repetir consultas pesadas (.exists()/.first()/.count()) contra el
+    # servidor remoto. (Se quita el prefetch_related redundante: 'baja' ya viene
+    # en el select_related.)
+    bienes = list(Bien.objects.filter(estado='BAJA').select_related(
+        'denominacion', 'cuenta_contable',
+        'usuario_asignado', 'usuario_asignado__area', 'usuario_asignado__oficina',
         'local', 'local__entidad', 'area', 'oficina', 'baja'
-    ).prefetch_related('baja').order_by('codigo_patrimonial')
+    ).order_by('codigo_patrimonial'))
+    total_bienes = len(bienes)
     
     # Crear respuesta HTTP con tipo PDF
     response = HttpResponse(content_type='application/pdf')
@@ -728,8 +714,8 @@ def generar_reporte_bienes_baja(request):
     # ===== ENTIDAD Y DEPENDENCIA =====
     # Obtener entidad del primer bien o usar default
     entidad_nombre = "MUNICIPALIDAD DISTRITAL DE JOSÉ LUIS BUSTAMANTE Y RIVERO"
-    if bienes.exists():
-        primer_bien = bienes.first()
+    if bienes:
+        primer_bien = bienes[0]
         if primer_bien.local and primer_bien.local.entidad:
             entidad_nombre = primer_bien.local.entidad.nombre.upper()
     
@@ -752,9 +738,7 @@ def generar_reporte_bienes_baja(request):
     elements.append(Spacer(1, 0.4*cm))
     
     # ===== BIENES DADOS DE BAJA =====
-    if bienes.exists():
-        total_bienes = bienes.count()
-        
+    if bienes:
         for idx, bien in enumerate(bienes, 1):
             # Obtener datos de baja
             baja = getattr(bien, 'baja', None)
@@ -954,8 +938,12 @@ def generar_reporte_por_cuentas_contables(request):
         except (ValueError, TypeError):
             pass  # Ignorar fechas inválidas
     
-    # Obtener bienes agrupados por cuenta contable
-    bienes_por_cuenta = bienes_query.select_related('cuenta_contable').values(
+    # Obtener bienes agrupados por cuenta contable.
+    # IMPORTANTE: se materializa en una lista para NO re-ejecutar la consulta de
+    # agregación (GROUP BY) varias veces más adelante. Antes se recorría este
+    # queryset hasta 4 veces (agrupar + 3 totales), cada una un viaje completo al
+    # servidor SQL remoto -> de ahí la lentitud extrema.
+    bienes_por_cuenta = list(bienes_query.values(
         'cuenta_contable__id',
         'cuenta_contable__codigo',
         'cuenta_contable__descripcion'
@@ -963,7 +951,17 @@ def generar_reporte_por_cuentas_contables(request):
         cantidad=Count('id'),
         valor_adquisicion_total=Sum('valor_adquisicion'),
         valor_neto_total=Sum('valor_neto')
-    ).order_by('cuenta_contable__codigo')
+    ).order_by('cuenta_contable__codigo'))
+
+    # Descripciones de las cuentas "base" (la parte antes del punto) en UNA sola
+    # consulta, en lugar de una consulta por cada código base dentro del bucle.
+    codigos_base_set = set()
+    for item in bienes_por_cuenta:
+        codigo = item['cuenta_contable__codigo']
+        codigos_base_set.add(codigo.split('.')[0] if '.' in codigo else codigo)
+    descripciones_base = dict(
+        CuentaContable.objects.filter(codigo__in=codigos_base_set).values_list('codigo', 'descripcion')
+    )
     
     # Crear nombre de archivo con fechas si están disponibles
     fecha_str = ''
@@ -1177,19 +1175,10 @@ def generar_reporte_por_cuentas_contables(request):
             codigo_base = codigo
         
         if codigo_base not in codigos_base:
-            # Intentar obtener la descripción de la cuenta base si existe
-            descripcion_base = ''
-            try:
-                cuenta_base_obj = CuentaContable.objects.filter(codigo=codigo_base).first()
-                if cuenta_base_obj:
-                    descripcion_base = cuenta_base_obj.descripcion
-            except:
-                pass
-            
-            # Si no se encontró, usar la descripción de la primera subcuenta
-            if not descripcion_base:
-                descripcion_base = item['cuenta_contable__descripcion']
-            
+            # Descripción de la cuenta base (ya precargada en una sola consulta);
+            # si no existe, se usa la descripción de la primera subcuenta.
+            descripcion_base = descripciones_base.get(codigo_base) or item['cuenta_contable__descripcion']
+
             codigos_base[codigo_base] = {
                 'codigo': codigo_base,
                 'descripcion': descripcion_base,
