@@ -279,6 +279,7 @@
 <!-- ===== QUICK ACTIONS ===== -->
 <div class="section-title">Acceso R&aacute;pido</div>
 <div class="qa-grid mb-4">
+    {% if perms.bienes.add_bien %}
     <a href="{% url 'inventario:bien_create' %}" class="qa-card">
         <div class="qa-icon" style="background:#dbeafe; color:#2563eb;"><i class="fas fa-plus"></i></div>
         <div>
@@ -286,6 +287,8 @@
             <p>Dar de alta un nuevo bien patrimonial en el sistema</p>
         </div>
     </a>
+    {% endif %}
+    {% if perms.personal.add_personal %}
     <a href="{% url 'inventario:personal_create' %}" class="qa-card">
         <div class="qa-icon" style="background:#d1fae5; color:#059669;"><i class="fas fa-user-plus"></i></div>
         <div>
@@ -293,6 +296,8 @@
             <p>Registrar un nuevo empleado responsable</p>
         </div>
     </a>
+    {% endif %}
+    {% if perms.traslados.add_trasladobien %}
     <a href="{% url 'inventario:traslado_bienes_index' %}" class="qa-card">
         <div class="qa-icon" style="background:#cffafe; color:#0891b2;"><i class="fas fa-exchange-alt"></i></div>
         <div>
@@ -300,6 +305,8 @@
             <p>Mover bienes entre personal u oficinas</p>
         </div>
     </a>
+    {% endif %}
+    {% if perms.bajas.add_bajabien %}
     <a href="{% url 'inventario:baja_bien_create' %}" class="qa-card">
         <div class="qa-icon" style="background:#fee2e2; color:#dc2626;"><i class="fas fa-ban"></i></div>
         <div>
@@ -307,6 +314,8 @@
             <p>Dar de baja un bien patrimonial</p>
         </div>
     </a>
+    {% endif %}
+    {% if perms.traslados.add_trasladobien %}
     <a href="{% url 'inventario:escanear_codigos_barras' %}" class="qa-card">
         <div class="qa-icon" style="background:#ede9fe; color:#7c3aed;"><i class="fas fa-barcode"></i></div>
         <div>
@@ -314,6 +323,7 @@
             <p>Traslado masivo por c&oacute;digo de barras</p>
         </div>
     </a>
+    {% endif %}
     <a href="{% url 'inventario:reportes_index' %}" class="qa-card">
         <div class="qa-icon" style="background:#fef3c7; color:#d97706;"><i class="fas fa-file-pdf"></i></div>
         <div>
@@ -328,6 +338,7 @@
             <p>Imprimir etiquetas con c&oacute;digo patrimonial</p>
         </div>
     </a>
+    {% if user.is_superuser %}
     <a href="{% url 'inventario:importar_inventario' %}" class="qa-card">
         <div class="qa-icon" style="background:#f0fdf4; color:#16a34a;"><i class="fas fa-file-upload"></i></div>
         <div>
@@ -335,6 +346,7 @@
             <p>Importar bienes desde archivo CSV</p>
         </div>
     </a>
+    {% endif %}
 </div>
 
 <!-- ===== SECONDARY KPIS ===== -->

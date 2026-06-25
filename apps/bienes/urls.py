@@ -27,5 +27,6 @@ urlpatterns = [
     path('ajax/valor-neto/', views.obtener_valor_neto, name='obtener_valor_neto'),
     path('ajax/buscar-bien-baja/', views.buscar_bien_ajax, name='buscar_bien_ajax'),
     path('ajax/buscar-bien-etiquetas/', views.buscar_bien_etiquetas, name='buscar_bien_etiquetas'),
+    path('ajax/buscar-resolucion-etiquetas/', views.buscar_resolucion_etiquetas, name='buscar_resolucion_etiquetas'),
     path('ajax/bien/<int:pk>/', views.obtener_bien_ajax, name='obtener_bien_ajax'),
 ]

@@ -354,12 +354,25 @@
                     <span class="text-muted" style="font-size:.82rem;">
                         <i class="fas fa-user-circle me-1"></i>
                         <strong>{{ user.get_full_name|default:user.username }}</strong>
+                        {% if user.is_superuser %}
+                            <span class="badge bg-primary ms-1" style="font-size:.62rem;">Administrador</span>
+                        {% else %}
+                            <span class="badge bg-secondary ms-1" style="font-size:.62rem;">Trabajador</span>
+                        {% endif %}
                     </span>
-                    <a href="{% url 'admin:logout' %}" class="btn btn-outline-danger btn-sm" style="font-size:.78rem;">
-                        <i class="fas fa-sign-out-alt me-1"></i>Salir
+                    {% if user.is_superuser %}
+                    <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary btn-sm" style="font-size:.78rem;" title="Administración de usuarios">
+                        <i class="fas fa-users-cog me-1"></i>Usuarios
                     </a>
+                    {% endif %}
+                    <form method="post" action="{% url 'logout' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size:.78rem;">
+                            <i class="fas fa-sign-out-alt me-1"></i>Salir
+                        </button>
+                    </form>
                 {% else %}
-                    <a href="{% url 'admin:login' %}" class="btn btn-primary btn-sm" style="font-size:.78rem;">
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-sm" style="font-size:.78rem;">
                         <i class="fas fa-sign-in-alt me-1"></i>Iniciar Sesi&oacute;n
                     </a>
                 {% endif %}

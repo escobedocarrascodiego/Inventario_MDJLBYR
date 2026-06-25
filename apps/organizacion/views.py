@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import Entidad, Local, Area, Oficina, UbicacionFisica
 from .forms import EntidadForm, LocalForm, AreaForm, OficinaForm, UbicacionFisicaForm
+from inventario.permisos import PermisoRequeridoMixin
 
 
 # ==============================================================================
@@ -34,7 +35,8 @@ class EntidadListView(ListView):
         return context
 
 
-class EntidadCreateView(SuccessMessageMixin, CreateView):
+class EntidadCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'organizacion.add_entidad'
     model = Entidad
     form_class = EntidadForm
     template_name = 'inventario/entidad_form.html'
@@ -48,7 +50,8 @@ class EntidadCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class EntidadUpdateView(SuccessMessageMixin, UpdateView):
+class EntidadUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'organizacion.change_entidad'
     model = Entidad
     form_class = EntidadForm
     template_name = 'inventario/entidad_form.html'
@@ -62,7 +65,8 @@ class EntidadUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class EntidadDeleteView(SuccessMessageMixin, DeleteView):
+class EntidadDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'organizacion.delete_entidad'
     model = Entidad
     template_name = 'inventario/entidad_confirm_delete.html'
     success_url = reverse_lazy('inventario:entidad_list')
@@ -99,7 +103,8 @@ class LocalListView(ListView):
         return context
 
 
-class LocalCreateView(SuccessMessageMixin, CreateView):
+class LocalCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'organizacion.add_local'
     model = Local
     form_class = LocalForm
     template_name = 'inventario/local_form.html'
@@ -113,7 +118,8 @@ class LocalCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class LocalUpdateView(SuccessMessageMixin, UpdateView):
+class LocalUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'organizacion.change_local'
     model = Local
     form_class = LocalForm
     template_name = 'inventario/local_form.html'
@@ -127,7 +133,8 @@ class LocalUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class LocalDeleteView(SuccessMessageMixin, DeleteView):
+class LocalDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'organizacion.delete_local'
     model = Local
     template_name = 'inventario/local_confirm_delete.html'
     success_url = reverse_lazy('inventario:local_list')
@@ -164,7 +171,8 @@ class AreaListView(ListView):
         return context
 
 
-class AreaCreateView(SuccessMessageMixin, CreateView):
+class AreaCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'organizacion.add_area'
     model = Area
     form_class = AreaForm
     template_name = 'inventario/area_form.html'
@@ -178,7 +186,8 @@ class AreaCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class AreaUpdateView(SuccessMessageMixin, UpdateView):
+class AreaUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'organizacion.change_area'
     model = Area
     form_class = AreaForm
     template_name = 'inventario/area_form.html'
@@ -192,7 +201,8 @@ class AreaUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class AreaDeleteView(SuccessMessageMixin, DeleteView):
+class AreaDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'organizacion.delete_area'
     model = Area
     template_name = 'inventario/area_confirm_delete.html'
     success_url = reverse_lazy('inventario:area_list')
@@ -229,7 +239,8 @@ class OficinaListView(ListView):
         return context
 
 
-class OficinaCreateView(SuccessMessageMixin, CreateView):
+class OficinaCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'organizacion.add_oficina'
     model = Oficina
     form_class = OficinaForm
     template_name = 'inventario/oficina_form.html'
@@ -243,7 +254,8 @@ class OficinaCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class OficinaUpdateView(SuccessMessageMixin, UpdateView):
+class OficinaUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'organizacion.change_oficina'
     model = Oficina
     form_class = OficinaForm
     template_name = 'inventario/oficina_form.html'
@@ -257,7 +269,8 @@ class OficinaUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class OficinaDeleteView(SuccessMessageMixin, DeleteView):
+class OficinaDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'organizacion.delete_oficina'
     model = Oficina
     template_name = 'inventario/oficina_confirm_delete.html'
     success_url = reverse_lazy('inventario:oficina_list')
@@ -295,7 +308,8 @@ class UbicacionFisicaListView(ListView):
         return context
 
 
-class UbicacionFisicaCreateView(SuccessMessageMixin, CreateView):
+class UbicacionFisicaCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'organizacion.add_ubicacionfisica'
     model = UbicacionFisica
     form_class = UbicacionFisicaForm
     template_name = 'inventario/ubicacionfisica_form.html'
@@ -309,7 +323,8 @@ class UbicacionFisicaCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class UbicacionFisicaUpdateView(SuccessMessageMixin, UpdateView):
+class UbicacionFisicaUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'organizacion.change_ubicacionfisica'
     model = UbicacionFisica
     form_class = UbicacionFisicaForm
     template_name = 'inventario/ubicacionfisica_form.html'
@@ -323,7 +338,8 @@ class UbicacionFisicaUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class UbicacionFisicaDeleteView(SuccessMessageMixin, DeleteView):
+class UbicacionFisicaDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'organizacion.delete_ubicacionfisica'
     model = UbicacionFisica
     template_name = 'inventario/ubicacionfisica_confirm_delete.html'
     success_url = reverse_lazy('inventario:ubicacionfisica_list')

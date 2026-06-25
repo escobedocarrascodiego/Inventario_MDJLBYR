@@ -9,9 +9,11 @@
 <div class="card">
     <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Lista de Cuentas Contables</h5>
+        {% if perms.catalogos.add_cuentacontable %}
         <a href="{% url 'inventario:cuentacontable_create' %}" class="btn btn-light btn-sm">
             <i class="fas fa-plus me-1"></i>Nueva Cuenta
         </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <!-- Tabla de cuentas contables -->

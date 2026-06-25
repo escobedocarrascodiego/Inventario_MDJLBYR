@@ -22,6 +22,28 @@ class BienForm(forms.ModelForm):
             'autocomplete': 'off'
         })
     )
+
+    # Cantidad de bienes a registrar (no se guarda en el modelo). Si es > 1 se
+    # crean N bienes idénticos, cada uno con su propio código patrimonial
+    # correlativo. Se usa en el "Ingreso X Grupo".
+    cantidad = forms.IntegerField(
+        required=False,
+        min_value=1,
+        initial=1,
+        label="Cantidad",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'id': 'id_cantidad',
+            'min': '1',
+            'value': '1',
+        })
+    )
+
+    def clean_cantidad(self):
+        cantidad = self.cleaned_data.get('cantidad')
+        if not cantidad or cantidad < 1:
+            return 1
+        return cantidad
     
     class Meta:
         model = Bien
@@ -234,6 +256,7 @@ class EtiquetaFiltroForm(forms.Form):
         ('por_local', 'Por Local'),
         ('por_area', 'Por Área'),
         ('por_oficina', 'Por Oficina'),
+        ('por_resolucion', 'Por Orden de Compra / Resolución de Alta'),
         ('por_año', 'Por Año de Adquisición'),
     ]
     
@@ -309,6 +332,16 @@ class EtiquetaFiltroForm(forms.Form):
         label="Oficina",
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_oficina'})
     )
+
+    resolucion_alta = forms.ChoiceField(
+        required=False,
+        label="Orden de Compra / Resolución de Alta",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_resolucion_alta',
+            'data-ajax-url': '/ajax/buscar-resolucion-etiquetas/'
+        })
+    )
     
     año_adquisicion = forms.IntegerField(
         required=False,
@@ -344,6 +377,14 @@ class EtiquetaFiltroForm(forms.Form):
                 etiqueta = f"{persona.apellidos}, {persona.nombres} — DNI: {persona.numero_documento}"
                 usuario_choices.append((str(persona.id), etiqueta))
         self.fields['usuario'].choices = usuario_choices
+
+        # Precargar la opción de resolución/orden de compra elegida (es texto libre
+        # del propio bien, así que el value de la opción es la misma cadena).
+        resolucion_val = (self.data.get('resolucion_alta') or self.initial.get('resolucion_alta') or '').strip()
+        resolucion_choices = [('', 'Seleccione una orden de compra / resolución')]
+        if resolucion_val:
+            resolucion_choices.append((resolucion_val, resolucion_val))
+        self.fields['resolucion_alta'].choices = resolucion_choices
 
         self.helper = FormHelper()
         self.helper.layout = Layout(
@@ -410,6 +451,25 @@ class EtiquetaFiltroForm(forms.Form):
                 Column('oficina', css_class='col-md-12'),
             ),
             HTML('</div>'),
+            HTML('<div id="campo-resolucion" class="mt-3" style="display: none;">'),
+            Row(
+                Column(
+                    HTML(
+                        '<label class="form-label" for="resolucion-search">Buscar orden de compra / resolución de alta</label>'
+                        '<div class="input-group">'
+                        '<input type="text" id="resolucion-search" class="form-control" '
+                        'placeholder="Escriba parte de la orden de compra o resolución" autocomplete="off">'
+                        '<button type="button" id="resolucion-search-btn" class="btn btn-primary">'
+                        '<i class="fas fa-search me-1"></i>Buscar</button>'
+                        '</div>'
+                    ),
+                    css_class='col-md-12'
+                ),
+            ),
+            Row(
+                Column('resolucion_alta', css_class='col-md-12 mt-2'),
+            ),
+            HTML('</div>'),
             HTML('<div id="campo-año-adquisicion" class="mt-3" style="display: none;">'),
             Row(
                 Column('año_adquisicion', css_class='col-md-6'),
@@ -417,9 +477,10 @@ class EtiquetaFiltroForm(forms.Form):
             HTML('</div>'),
             HTML('<div class="alert alert-info mt-3">'),
             HTML('<i class="fas fa-info-circle me-2"></i>'),
-            HTML('<strong>Nota:</strong> El campo "Año" es obligatorio y aparecerá en todas las etiquetas generadas.'),
+            HTML('<strong>Nota:</strong> El campo "Año" es obligatorio y aparecerá en todas las etiquetas. '
+                 'Al continuar verá la lista de bienes para marcar exactamente cuáles imprimir.'),
             HTML('</div>'),
-            Submit('submit', 'Generar Etiquetas', css_class='btn btn-primary mt-3')
+            Submit('submit', 'Buscar y seleccionar bienes', css_class='btn btn-primary mt-3')
         )
 
     def clean_bien(self):
@@ -443,6 +504,10 @@ class EtiquetaFiltroForm(forms.Form):
         if not persona:
             raise forms.ValidationError("Seleccione un usuario válido.")
         return persona
+
+    def clean_resolucion_alta(self):
+        valor = (self.cleaned_data.get('resolucion_alta') or '').strip()
+        return valor or None
 
 
 # ==============================================================================

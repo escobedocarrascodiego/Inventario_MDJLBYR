@@ -9,9 +9,11 @@
 <div class="card">
     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Lista de Grupos Genéricos</h5>
+        {% if perms.catalogos.add_grupogenerico %}
         <a href="{% url 'inventario:grupogenerico_create' %}" class="btn btn-light btn-sm">
             <i class="fas fa-plus me-1"></i>Nuevo Grupo
         </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -40,17 +42,21 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{% url 'inventario:grupogenerico_update' grupo.pk %}" 
-                                   class="btn btn-outline-primary" 
+                                {% if perms.catalogos.change_grupogenerico %}
+                                <a href="{% url 'inventario:grupogenerico_update' grupo.pk %}"
+                                   class="btn btn-outline-primary"
                                    title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{% url 'inventario:grupogenerico_delete' grupo.pk %}" 
-                                   class="btn btn-outline-danger" 
+                                {% endif %}
+                                {% if perms.catalogos.delete_grupogenerico %}
+                                <a href="{% url 'inventario:grupogenerico_delete' grupo.pk %}"
+                                   class="btn btn-outline-danger"
                                    title="Eliminar"
                                    onclick="return confirm('¿Está seguro de eliminar este grupo genérico?');">
                                     <i class="fas fa-trash"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

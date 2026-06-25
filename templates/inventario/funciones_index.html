@@ -59,16 +59,17 @@
                 </div>
                 <h5 class="card-title mb-3">Baja de Bienes</h5>
                 <p class="card-text text-muted mb-4">
-                    Registre la baja de bienes patrimoniales con documentación y justificación correspondiente.
+                    Consulte los bienes dados de baja{% if perms.bajas.add_bajabien %} y registre nuevas bajas con su documentación y justificación{% endif %}.
                 </p>
-                <a href="{% url 'inventario:baja_bien_create' %}" class="btn btn-danger btn-sm">
-                    <i class="fas fa-trash-alt me-2"></i>Registrar Baja
+                <a href="{% url 'inventario:baja_bienes_list' %}" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash-alt me-2"></i>{% if perms.bajas.add_bajabien %}Ver / Registrar Bajas{% else %}Ver Bajas{% endif %}
                 </a>
             </div>
         </div>
     </div>
 
     <!-- Traslado de Bienes -->
+    {% if perms.traslados.add_trasladobien %}
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
             <div class="card-body text-center p-4">
@@ -85,8 +86,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Escanear Códigos de Barras -->
+    {% if perms.traslados.add_trasladobien %}
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
             <div class="card-body text-center p-4">
@@ -103,6 +106,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Consulta Histórica -->
     <div class="col-md-6 col-lg-4">
@@ -123,6 +127,7 @@
     </div>
 
     <!-- Cierre de Año Fiscal -->
+    {% if user.is_superuser %}
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
             <div class="card-body text-center p-4">
@@ -139,8 +144,10 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Carga Masiva -->
+    {% if user.is_superuser %}
     <div class="col-md-6 col-lg-4">
         <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
             <div class="card-body text-center p-4">
@@ -157,6 +164,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <style>

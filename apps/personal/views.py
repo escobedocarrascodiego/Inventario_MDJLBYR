@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import Personal
 from .forms import PersonalForm
+from inventario.permisos import PermisoRequeridoMixin
 
 
 # ==============================================================================
@@ -87,14 +88,22 @@ def personal_datatable(request):
 
         edit_url = reverse('inventario:personal_update', args=[persona.pk])
         delete_url = reverse('inventario:personal_delete', args=[persona.pk])
+        _botones = []
+        if request.user.has_perm('personal.change_personal'):
+            _botones.append(
+                f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
+                '<i class="fas fa-edit"></i></a>'
+            )
+        if request.user.has_perm('personal.delete_personal'):
+            _botones.append(
+                f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
+                "onclick=\"return confirm('¿Está seguro de eliminar este personal?');\">"
+                '<i class="fas fa-trash"></i></a>'
+            )
         acciones = (
             '<div class="btn-group btn-group-sm" role="group">'
-            f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
-            '<i class="fas fa-edit"></i></a>'
-            f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
-            "onclick=\"return confirm('¿Está seguro de eliminar este personal?');\">"
-            '<i class="fas fa-trash"></i></a>'
-            '</div>'
+            + ''.join(_botones)
+            + '</div>'
         )
 
         data.append([
@@ -135,7 +144,8 @@ class PersonalListView(ListView):
         return context
 
 
-class PersonalCreateView(SuccessMessageMixin, CreateView):
+class PersonalCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'personal.add_personal'
     model = Personal
     form_class = PersonalForm
     template_name = 'inventario/personal_form.html'
@@ -149,7 +159,8 @@ class PersonalCreateView(SuccessMessageMixin, CreateView):
         return context
 
 
-class PersonalUpdateView(SuccessMessageMixin, UpdateView):
+class PersonalUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'personal.change_personal'
     model = Personal
     form_class = PersonalForm
     template_name = 'inventario/personal_form.html'
@@ -163,7 +174,8 @@ class PersonalUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class PersonalDeleteView(SuccessMessageMixin, DeleteView):
+class PersonalDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'personal.delete_personal'
     model = Personal
     template_name = 'inventario/personal_confirm_delete.html'
     success_url = reverse_lazy('inventario:personal_list')

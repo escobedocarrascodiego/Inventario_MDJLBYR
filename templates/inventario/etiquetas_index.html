@@ -39,7 +39,7 @@
                 <p class="small mb-1"><strong>Impresora Zebra (ZPL):</strong></p>
                 <ul class="small">
                     <li>Imprime <strong>2 etiquetas por fila</strong> (5 × 2.5 cm).</li>
-                    <li>Sale directo a la impresora USB instalada en Windows.</li>
+                    <li>Sale directo a la impresora por Red.</li>
                     <li>Si la impresora no responde, se descarga un archivo <code>.zpl</code>.</li>
                 </ul>
                 <hr>
@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const campoLocal = document.getElementById('campo-local');
     const campoArea = document.getElementById('campo-area');
     const campoOficina = document.getElementById('campo-oficina');
+    const campoResolucion = document.getElementById('campo-resolucion');
     const campoAñoAdquisicion = document.getElementById('campo-año-adquisicion');
 
     function toggleCampos() {
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         campoLocal.style.display = 'none';
         campoArea.style.display = 'none';
         campoOficina.style.display = 'none';
+        campoResolucion.style.display = 'none';
         campoAñoAdquisicion.style.display = 'none';
 
         // Mostrar el campo según la selección
@@ -84,6 +86,8 @@ document.addEventListener('DOMContentLoaded', function() {
             campoArea.style.display = 'block';
         } else if (valor === 'por_oficina') {
             campoOficina.style.display = 'block';
+        } else if (valor === 'por_resolucion') {
+            campoResolucion.style.display = 'block';
         } else if (valor === 'por_año') {
             campoAñoAdquisicion.style.display = 'block';
         }
@@ -174,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     configurarBuscador('bien-search', 'bien-search-btn', 'id_bien', 'Seleccione un bien');
     configurarBuscador('usuario-search', 'usuario-search-btn', 'id_usuario', 'Seleccione un usuario');
+    configurarBuscador('resolucion-search', 'resolucion-search-btn', 'id_resolucion_alta', 'Seleccione una orden de compra / resolución');
 
     tipoGeneracion.addEventListener('change', toggleCampos);
     toggleCampos(); // Ejecutar al cargar la página

@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .models import CuentaContable, GrupoGenerico, Clase, Denominacion
 from .forms import CuentaContableForm, GrupoGenericoForm, ClaseForm, DenominacionForm
+from inventario.permisos import PermisoRequeridoMixin
 
 
 # ==============================================================================
@@ -20,21 +21,24 @@ class GrupoGenericoListView(ListView):
     template_name = 'inventario/grupogenerico_list.html'
     context_object_name = 'grupos'
 
-class GrupoGenericoCreateView(SuccessMessageMixin, CreateView):
+class GrupoGenericoCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'catalogos.add_grupogenerico'
     model = GrupoGenerico
     form_class = GrupoGenericoForm
     template_name = 'inventario/grupogenerico_form.html'
     success_url = reverse_lazy('inventario:grupogenerico_list')
     success_message = "Grupo Genérico creado exitosamente."
 
-class GrupoGenericoUpdateView(SuccessMessageMixin, UpdateView):
+class GrupoGenericoUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'catalogos.change_grupogenerico'
     model = GrupoGenerico
     form_class = GrupoGenericoForm
     template_name = 'inventario/grupogenerico_form.html'
     success_url = reverse_lazy('inventario:grupogenerico_list')
     success_message = "Grupo Genérico actualizado exitosamente."
 
-class GrupoGenericoDeleteView(SuccessMessageMixin, DeleteView):
+class GrupoGenericoDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'catalogos.delete_grupogenerico'
     model = GrupoGenerico
     template_name = 'inventario/grupogenerico_confirm_delete.html'
     success_url = reverse_lazy('inventario:grupogenerico_list')
@@ -51,21 +55,24 @@ class ClaseListView(ListView):
     def get_queryset(self):
         return Clase.objects.select_related('grupo_generico', 'cuenta_contable').filter(activo=True).order_by('grupo_generico', 'nombre')
 
-class ClaseCreateView(SuccessMessageMixin, CreateView):
+class ClaseCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'catalogos.add_clase'
     model = Clase
     form_class = ClaseForm
     template_name = 'inventario/clase_form.html'
     success_url = reverse_lazy('inventario:clase_list')
     success_message = "Clase creada exitosamente."
 
-class ClaseUpdateView(SuccessMessageMixin, UpdateView):
+class ClaseUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'catalogos.change_clase'
     model = Clase
     form_class = ClaseForm
     template_name = 'inventario/clase_form.html'
     success_url = reverse_lazy('inventario:clase_list')
     success_message = "Clase actualizada exitosamente."
 
-class ClaseDeleteView(SuccessMessageMixin, DeleteView):
+class ClaseDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'catalogos.delete_clase'
     model = Clase
     template_name = 'inventario/clase_confirm_delete.html'
     success_url = reverse_lazy('inventario:clase_list')
@@ -83,14 +90,16 @@ class DenominacionListView(ListView):
         # El listado se carga vía DataTables (server-side); aquí no traemos registros.
         return Denominacion.objects.none()
 
-class DenominacionCreateView(SuccessMessageMixin, CreateView):
+class DenominacionCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'catalogos.add_denominacion'
     model = Denominacion
     form_class = DenominacionForm
     template_name = 'inventario/denominacion_form.html'
     success_url = reverse_lazy('inventario:denominacion_list')
     success_message = "Denominación creada exitosamente."
 
-class DenominacionUpdateView(SuccessMessageMixin, UpdateView):
+class DenominacionUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'catalogos.change_denominacion'
     model = Denominacion
     form_class = DenominacionForm
     template_name = 'inventario/denominacion_form.html'
@@ -111,7 +120,8 @@ class DenominacionUpdateView(SuccessMessageMixin, UpdateView):
         )
         return response
 
-class DenominacionDeleteView(SuccessMessageMixin, DeleteView):
+class DenominacionDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'catalogos.delete_denominacion'
     model = Denominacion
     template_name = 'inventario/denominacion_confirm_delete.html'
     success_url = reverse_lazy('inventario:denominacion_list')
@@ -263,14 +273,22 @@ def denominaciones_datatable(request):
 
         edit_url = reverse('inventario:denominacion_update', args=[den.pk])
         delete_url = reverse('inventario:denominacion_delete', args=[den.pk])
+        botones = []
+        if request.user.has_perm('catalogos.change_denominacion'):
+            botones.append(
+                f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
+                '<i class="fas fa-edit"></i></a>'
+            )
+        if request.user.has_perm('catalogos.delete_denominacion'):
+            botones.append(
+                f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
+                "onclick=\"return confirm('¿Está seguro de eliminar esta denominación?');\">"
+                '<i class="fas fa-trash"></i></a>'
+            )
         acciones = (
             '<div class="btn-group btn-group-sm" role="group">'
-            f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
-            '<i class="fas fa-edit"></i></a>'
-            f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
-            "onclick=\"return confirm('¿Está seguro de eliminar esta denominación?');\">"
-            '<i class="fas fa-trash"></i></a>'
-            '</div>'
+            + ''.join(botones)
+            + '</div>'
         )
 
         data.append([
@@ -347,21 +365,24 @@ class CuentaContableListView(ListView):
         context['search'] = self.request.GET.get('search', '')
         return context
 
-class CuentaContableCreateView(SuccessMessageMixin, CreateView):
+class CuentaContableCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'catalogos.add_cuentacontable'
     model = CuentaContable
     form_class = CuentaContableForm
     template_name = 'inventario/cuentacontable_form.html'
     success_url = reverse_lazy('inventario:cuentacontable_list')
     success_message = "Cuenta Contable creada exitosamente."
 
-class CuentaContableUpdateView(SuccessMessageMixin, UpdateView):
+class CuentaContableUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'catalogos.change_cuentacontable'
     model = CuentaContable
     form_class = CuentaContableForm
     template_name = 'inventario/cuentacontable_form.html'
     success_url = reverse_lazy('inventario:cuentacontable_list')
     success_message = "Cuenta Contable actualizada exitosamente."
 
-class CuentaContableDeleteView(SuccessMessageMixin, DeleteView):
+class CuentaContableDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'catalogos.delete_cuentacontable'
     model = CuentaContable
     template_name = 'inventario/cuentacontable_confirm_delete.html'
     success_url = reverse_lazy('inventario:cuentacontable_list')
@@ -437,14 +458,22 @@ def cuentas_contables_datatable(request):
 
         edit_url = reverse('inventario:cuentacontable_update', args=[cuenta.pk])
         delete_url = reverse('inventario:cuentacontable_delete', args=[cuenta.pk])
+        _botones_cc = []
+        if request.user.has_perm('catalogos.change_cuentacontable'):
+            _botones_cc.append(
+                f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
+                '<i class="fas fa-edit"></i></a>'
+            )
+        if request.user.has_perm('catalogos.delete_cuentacontable'):
+            _botones_cc.append(
+                f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
+                "onclick=\"return confirm('¿Está seguro de eliminar esta cuenta contable?');\">"
+                '<i class="fas fa-trash"></i></a>'
+            )
         acciones = (
             '<div class="btn-group btn-group-sm" role="group">'
-            f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
-            '<i class="fas fa-edit"></i></a>'
-            f'<a href="{delete_url}" class="btn btn-outline-danger" title="Eliminar" '
-            "onclick=\"return confirm('¿Está seguro de eliminar esta cuenta contable?');\">"
-            '<i class="fas fa-trash"></i></a>'
-            '</div>'
+            + ''.join(_botones_cc)
+            + '</div>'
         )
 
         data.append([

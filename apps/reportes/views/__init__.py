@@ -15,7 +15,6 @@ from .excel import (
 )
 from .etiquetas import (
     etiquetas_index,
-    generar_etiquetas_pdf,
 )
 from .fichas import (
     fichas_index,

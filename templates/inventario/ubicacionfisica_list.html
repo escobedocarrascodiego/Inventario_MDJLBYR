@@ -9,9 +9,11 @@
 <div class="card">
     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-map-pin me-2"></i>Lista de Ubicaciones Físicas</h5>
+        {% if perms.organizacion.add_ubicacionfisica %}
         <a href="{% url 'inventario:ubicacionfisica_create' %}" class="btn btn-light btn-sm">
             <i class="fas fa-plus me-1"></i>Nueva Ubicación
         </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <!-- Barra de búsqueda -->
@@ -63,17 +65,21 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
+                                {% if perms.organizacion.change_ubicacionfisica %}
                                 <a href="{% url 'inventario:ubicacionfisica_update' ubicacion.pk %}"
                                    class="btn btn-outline-primary"
                                    title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
+                                {% endif %}
+                                {% if perms.organizacion.delete_ubicacionfisica %}
                                 <a href="{% url 'inventario:ubicacionfisica_delete' ubicacion.pk %}"
                                    class="btn btn-outline-danger"
                                    title="Eliminar"
                                    onclick="return confirm('¿Está seguro de eliminar esta ubicación?');">
                                     <i class="fas fa-trash"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

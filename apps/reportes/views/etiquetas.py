@@ -23,93 +23,139 @@ from bienes.forms import EtiquetaFiltroForm
 
 
 def etiquetas_index(request):
-    """Vista para seleccionar el tipo de generación de etiquetas"""
+    """Etiquetas en dos pasos:
+
+    1) El usuario elige el filtro (usuario, local, oficina, resolución, etc.) y
+       se le muestra la lista de bienes que coinciden, con casillas y un buscador
+       para que marque EXACTAMENTE cuáles imprimir.
+    2) Al confirmar, se generan las etiquetas solo de los bienes marcados.
+    """
     if request.method == 'POST':
+        # Paso 2: ya eligió en la lista qué bienes imprimir
+        if request.POST.get('accion') == 'generar_seleccionados':
+            return _generar_etiquetas_seleccionadas(request)
+        # Paso 1: aplicar el filtro y mostrar la lista de selección
         form = EtiquetaFiltroForm(request.POST)
         if form.is_valid():
-            return generar_etiquetas_pdf(request, form.cleaned_data)
+            return _procesar_filtro_etiquetas(request, form)
     else:
         form = EtiquetaFiltroForm()
-    
+
     return render(request, 'inventario/etiquetas_index.html', {'form': form})
 
 
+def _filtrar_bienes(form_data):
+    """Aplica el filtro elegido. Devuelve (queryset, error).
 
-
-def generar_etiquetas_pdf(request, form_data):
-    """Genera etiquetas en PDF (o ZPL para Zebra) según los filtros seleccionados"""
+    `error` es None si todo está bien; si falta un dato obligatorio del filtro,
+    devuelve (None, "mensaje") para mostrárselo al usuario.
+    """
     tipo_generacion = form_data.get('tipo_generacion')
-    año = form_data.get('año')
-    formato = form_data.get('formato') or 'pdf'
-
-    if not año:
-        messages.error(request, "El campo 'Año' es obligatorio.")
-        form = EtiquetaFiltroForm(request.POST)
-        return render(request, 'inventario/etiquetas_index.html', {'form': form})
-    
-    # Obtener bienes según el tipo de generación
     bienes = Bien.objects.exclude(estado='BAJA').select_related(
         'denominacion', 'cuenta_contable', 'usuario_asignado',
         'local', 'area', 'oficina'
     )
-    
+
     if tipo_generacion == 'bien_especifico':
-        bien_id = form_data.get('bien')
-        if bien_id:
-            bienes = bienes.filter(id=bien_id.id)
-        else:
-            messages.error(request, "Debe seleccionar un bien específico.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
+        bien = form_data.get('bien')
+        if not bien:
+            return None, "Debe seleccionar un bien específico."
+        bienes = bienes.filter(id=bien.id)
     elif tipo_generacion == 'por_usuario':
         usuario = form_data.get('usuario')
-        if usuario:
-            bienes = bienes.filter(usuario_asignado=usuario)
-        else:
-            messages.error(request, "Debe seleccionar un usuario.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
+        if not usuario:
+            return None, "Debe seleccionar un usuario."
+        bienes = bienes.filter(usuario_asignado=usuario)
     elif tipo_generacion == 'por_local':
         local = form_data.get('local')
-        if local:
-            bienes = bienes.filter(local=local)
-        else:
-            messages.error(request, "Debe seleccionar un local.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
+        if not local:
+            return None, "Debe seleccionar un local."
+        bienes = bienes.filter(local=local)
     elif tipo_generacion == 'por_area':
         area = form_data.get('area')
-        if area:
-            bienes = bienes.filter(area=area)
-        else:
-            messages.error(request, "Debe seleccionar un área.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
+        if not area:
+            return None, "Debe seleccionar un área."
+        bienes = bienes.filter(area=area)
     elif tipo_generacion == 'por_oficina':
         oficina = form_data.get('oficina')
-        if oficina:
-            bienes = bienes.filter(oficina=oficina)
-        else:
-            messages.error(request, "Debe seleccionar una oficina.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
+        if not oficina:
+            return None, "Debe seleccionar una oficina."
+        bienes = bienes.filter(oficina=oficina)
+    elif tipo_generacion == 'por_resolucion':
+        resolucion = form_data.get('resolucion_alta')
+        if not resolucion:
+            return None, "Debe seleccionar una orden de compra / resolución de alta."
+        bienes = bienes.filter(resolucion_alta=resolucion)
     elif tipo_generacion == 'por_año':
         año_adq = form_data.get('año_adquisicion')
-        if año_adq:
-            bienes = bienes.filter(fecha_adquisicion__year=año_adq)
-        else:
-            messages.error(request, "Debe especificar el año de adquisición.")
-            form = EtiquetaFiltroForm(request.POST)
-            return render(request, 'inventario/etiquetas_index.html', {'form': form})
-    # Si es 'todos', no se filtra nada
-    
-    bienes = bienes.order_by('codigo_patrimonial')
-    
-    if not bienes.exists():
-        messages.warning(request, "No se encontraron bienes con los criterios seleccionados.")
-        form = EtiquetaFiltroForm(request.POST)
+        if not año_adq:
+            return None, "Debe especificar el año de adquisición."
+        bienes = bienes.filter(fecha_adquisicion__year=año_adq)
+    # 'todos' -> no se filtra nada
+
+    return bienes.order_by('codigo_patrimonial'), None
+
+
+def _procesar_filtro_etiquetas(request, form):
+    """Paso 1: filtra y muestra la lista de bienes para que el usuario elija cuáles imprimir."""
+    form_data = form.cleaned_data
+    año = form_data.get('año')
+
+    if not año:
+        messages.error(request, "El campo 'Año' es obligatorio.")
         return render(request, 'inventario/etiquetas_index.html', {'form': form})
 
+    bienes, error = _filtrar_bienes(form_data)
+    if error:
+        messages.error(request, error)
+        return render(request, 'inventario/etiquetas_index.html', {'form': form})
+
+    if not bienes.exists():
+        messages.warning(request, "No se encontraron bienes con los criterios seleccionados.")
+        return render(request, 'inventario/etiquetas_index.html', {'form': form})
+
+    context = {
+        'bienes': bienes,
+        'total': bienes.count(),
+        'anio': año,
+        'formato': form_data.get('formato') or 'zebra_zpl',
+        'tipo_generacion': form_data.get('tipo_generacion'),
+    }
+    return render(request, 'inventario/etiquetas_seleccion.html', context)
+
+
+def _generar_etiquetas_seleccionadas(request):
+    """Paso 2: genera las etiquetas SOLO de los bienes marcados en la lista."""
+    ids = request.POST.getlist('bienes_seleccionados')
+    formato = request.POST.get('formato') or 'zebra_zpl'
+    tipo_generacion = request.POST.get('tipo_generacion') or 'seleccion'
+    try:
+        año = int(request.POST.get('anio') or 0)
+    except (TypeError, ValueError):
+        año = 0
+
+    if not año:
+        messages.error(request, "Faltó el año. Vuelva a generar las etiquetas.")
+        return render(request, 'inventario/etiquetas_index.html', {'form': EtiquetaFiltroForm()})
+
+    if not ids:
+        messages.error(request, "No marcó ningún bien para imprimir.")
+        return render(request, 'inventario/etiquetas_index.html', {'form': EtiquetaFiltroForm()})
+
+    bienes = Bien.objects.exclude(estado='BAJA').select_related(
+        'denominacion', 'cuenta_contable', 'usuario_asignado',
+        'local', 'area', 'oficina'
+    ).filter(id__in=ids).order_by('codigo_patrimonial')
+
+    if not bienes.exists():
+        messages.warning(request, "Los bienes seleccionados ya no están disponibles.")
+        return render(request, 'inventario/etiquetas_index.html', {'form': EtiquetaFiltroForm()})
+
+    return _generar_salida_etiquetas(request, bienes, año, tipo_generacion, formato)
+
+
+def _generar_salida_etiquetas(request, bienes, año, tipo_generacion, formato):
+    """Genera la salida final (ZPL para la Zebra o PDF) de los bienes ya elegidos."""
     # === Formato ZPL nativo para la impresora Zebra ZT411 ===
     if formato == 'zebra_zpl':
         return _responder_etiquetas_zpl(request, bienes, año, tipo_generacion)
@@ -407,38 +453,61 @@ def _campos_etiqueta_zpl(bien, x_base, dpi, qr_mag, logo, anio, institucion,
     fecha = bien.fecha_adquisicion.strftime('%d/%m/%Y') if bien.fecha_adquisicion else ''
     oficina = _zpl_sanitizar(bien.oficina.nombre if bien.oficina else '')
 
+    # El QR lleva los datos clave del bien en JSON (igual que la versión PDF).
+    qr_payload = {
+        'Codigo Patrimonial': bien.codigo_patrimonial or 'N/A',
+        'Fecha Adquisición': bien.fecha_adquisicion.strftime('%d/%m/%Y') if bien.fecha_adquisicion else 'N/A',
+        'valor_adquisicion': f"{bien.valor_adquisicion:,.2f}" if bien.valor_adquisicion is not None else 'N/A',
+        'Nombre Oficina': bien.oficina.nombre if bien.oficina else 'N/A',
+        'Usuario Asignado': (
+            f"{bien.usuario_asignado.apellidos}, {bien.usuario_asignado.nombres}"
+            if bien.usuario_asignado else 'N/A'
+        ),
+    }
+    # JSON compacto (sin espacios) para usar la menor cantidad de módulos posible.
+    qr_text = _zpl_sanitizar(json.dumps(qr_payload, ensure_ascii=False, separators=(',', ':')))
+
     campos = []
     # Logo (escudo) arriba a la izquierda
     if logo:
-        campos.append(f'^FO{x_base + margen + d(0.7)},{d(0.7)}^XGR:LOGO.GRF,1,1^FS')
+        campos.append(f'^FO{x_base + margen + d(0.5)},{d(0.8)}^XGR:LOGO.GRF,1,1^FS')
     campos += [
-        # Control Patrimonial (arriba, centrado a la derecha del logo)
-        f'^FO{x_base + x_titulo},{d(1.0)}^FB{ancho_titulo},1,0,C,0'
-        f'^A0N,{d(2.3)},{d(2.3)}^FDControl Patrimonial {anio}^FS',
+        # "Control Patrimonial" como etiqueta a la izquierda del encabezado
+        f'^FO{x_base + x_titulo},{d(1.7)}^FB{ancho_titulo},1,0,L,0'
+        f'^A0N,{d(2.0)},{d(2.0)}^FDControl Patrimonial^FS',
+        # AÑO grande y resaltado a la derecha (doble impresión = negrita)
+        f'^FO{x_base + x_titulo},{d(0.5)}^FB{ancho_titulo},1,0,R,0'
+        f'^A0N,{d(3.4)},{d(3.4)}^FD{anio}^FS',
+        f'^FO{x_base + x_titulo + 1},{d(0.5)}^FB{ancho_titulo},1,0,R,0'
+        f'^A0N,{d(3.4)},{d(3.4)}^FD{anio}^FS',
         # Institución (centrado, hasta 2 líneas)
-        f'^FO{x_base + x_titulo},{d(3.7)}^FB{ancho_titulo},2,0,C,0'
-        f'^A0N,{d(2.2)},{d(2.2)}^FD{institucion}^FS',
-        # QR con el código patrimonial (izquierda)
-        f'^FO{x_base + margen + d(0.7)},{d(9.2)}^BQN,2,{qr_mag}^FDMA,{codigo}^FS',
+        f'^FO{x_base + x_titulo},{d(4.4)}^FB{ancho_titulo},2,0,C,0'
+        f'^A0N,{d(2.0)},{d(2.0)}^FD{institucion}^FS',
+        # QR con el JSON del bien (izquierda). EC nivel M = más tolerante a fallos
+        # de impresión, por lo que se escanea con más facilidad. ^BQ reserva ~10
+        # dots de zona de silencio sobre el símbolo, así que el origen va en d(7.5)
+        # para que el borde visible del QR quede a la altura del código (~d(8.7)).
+        f'^FO{x_base + margen + d(0.3)},{d(7.5)}^BQN,2,{qr_mag}^FDMA,{qr_text}^FS',
         # Bloque de datos (derecha): código en grande
-        f'^FO{x_base + x_datos},{d(8.8)}'
-        f'^A0N,{d(2.8)},{d(2.8)}^FD{codigo}^FS',
+        f'^FO{x_base + x_datos},{d(8.6)}'
+        f'^A0N,{d(2.7)},{d(2.7)}^FD{codigo}^FS',
         # Denominación (hasta 2 líneas)
-        f'^FO{x_base + x_datos},{d(11.9)}^FB{ancho_datos},2,0,L,0'
+        f'^FO{x_base + x_datos},{d(12.5)}^FB{ancho_datos},2,0,L,0'
         f'^A0N,{d(2.0)},{d(2.0)}^FD{denominacion}^FS',
         # Fecha de adquisición
-        f'^FO{x_base + x_datos},{d(16.6)}'
+        f'^FO{x_base + x_datos},{d(17.6)}'
         f'^A0N,{d(1.9)},{d(1.9)}^FD{fecha}^FS',
         # Oficina (hasta 2 líneas)
-        f'^FO{x_base + x_datos},{d(18.7)}^FB{ancho_datos},2,0,L,0'
-        f'^A0N,{d(1.9)},{d(1.9)}^FD{oficina}^FS',
+        f'^FO{x_base + x_datos},{d(20.5)}^FB{ancho_datos},2,0,L,0'
+        f'^A0N,{d(1.8)},{d(1.8)}^FD{oficina}^FS',
     ]
     return campos
 
 
 def construir_zpl_etiquetas(bienes, anio, nombre_institucion, dpi=203,
                             columnas=2, ancho_mm=50, alto_mm=25, gap_mm=2,
-                            margen_izq_mm=2.0, darkness=None, speed=None):
+                            margen_izq_mm=2.0, darkness=None, speed=None,
+                            qr_mag=1, offset_x_mm=0.0):
     """Construye el ZPL de una tanda de etiquetas para una Zebra.
 
     El rollo trae `columnas` etiquetas lado a lado (cada una de
@@ -458,26 +527,35 @@ def construir_zpl_etiquetas(bienes, anio, nombre_institucion, dpi=203,
     alto = d(alto_mm)
     paso = d(ancho_mm + gap_mm)                 # distancia entre inicios de columna
     ancho_total = columnas * ancho + (columnas - 1) * d(gap_mm)
-    # Magnificación del QR: módulos de ~0.4 mm -> siempre escaneable.
-    qr_mag = max(2, round(dpi / 60))            # 203 dpi -> 3, 300 dpi -> 5
+    # Desplazamiento global de toda la impresión (alinea con el papel montado).
+    offset_x = _zpl_dots(offset_x_mm, dpi)
+    # El QR lleva un JSON con todos los datos. `qr_mag` (configurable) controla
+    # su tamaño: 1 ~7 mm, 2 ~13 mm.
+    qr_mag = max(1, int(qr_mag or 1))
 
     # Margen izquierdo: separa logo, QR y título del borde de la etiqueta.
     margen = d(margen_izq_mm)
 
     institucion = _zpl_sanitizar(nombre_institucion)
-    x_datos = d(14)
-    ancho_datos = ancho - x_datos - d(0.5)
+    # Los datos empiezan a la derecha del QR. El ancho del QR depende de la
+    # magnificación (~7.8 mm por nivel con corrección de errores M), así que la
+    # columna de datos se adapta para dejar un margen blanco (zona de silencio).
+    ancho_qr_mm = 7.8 * qr_mag
+    x_datos = margen + d(ancho_qr_mm + 2.0)
+    ancho_datos = ancho - x_datos - d(1.0)
 
     # Logo del escudo: se descarga UNA sola vez a la memoria de la impresora
     # (~DG) y cada etiqueta solo lo invoca con ^XG. Si no hay logo, el título
     # ocupa todo el ancho centrado.
-    logo = _logo_zpl_grf(d(6.8))
+    logo = _logo_zpl_grf(d(5.6))
     if logo:
         logo_total, logo_bpr, _logo_h, logo_hex = logo
-        x_titulo = margen + d(8.0)
+        # El logo ocupa de margen+0.5 a margen+6.1 mm; el título arranca 1 mm
+        # después para que "Control Patrimonial" no quede pegado al escudo.
+        x_titulo = margen + d(7.1)
     else:
         x_titulo = margen
-    ancho_titulo = ancho - x_titulo - d(0.5)
+    ancho_titulo = ancho - x_titulo - margen
 
     salida = []
     # Oscuridad y velocidad: comandos de control que se aplican a toda la tanda.
@@ -500,12 +578,14 @@ def construir_zpl_etiquetas(bienes, anio, nombre_institucion, dpi=203,
         z = [
             '^XA',
             '^CI28',                            # UTF-8 (acentos y Ñ)
-            f'^PW{ancho_total}',
+            # Si se mueve todo a la derecha, el ancho de impresión debe crecer
+            # para no recortar la segunda etiqueta.
+            f'^PW{ancho_total + max(0, offset_x)}',
             f'^LL{alto}',
             '^LH0,0',
         ]
         for col, bien in enumerate(fila):
-            x_base = col * paso
+            x_base = offset_x + col * paso
             z += _campos_etiqueta_zpl(
                 bien, x_base, dpi, qr_mag, logo, anio, institucion,
                 x_titulo, ancho_titulo, x_datos, ancho_datos, margen,
@@ -551,10 +631,12 @@ def _responder_etiquetas_zpl(request, bienes, anio, tipo_generacion):
     margen_izq_mm = getattr(settings, 'ZEBRA_LABEL_MARGEN_IZQ_MM', 2.0)
     darkness = getattr(settings, 'ZEBRA_PRINTER_DARKNESS', None)
     speed = getattr(settings, 'ZEBRA_PRINTER_SPEED', None)
+    qr_mag = getattr(settings, 'ZEBRA_QR_MAGNIFICACION', 2)
+    offset_x_mm = getattr(settings, 'ZEBRA_OFFSET_GLOBAL_X_MM', 0.0)
 
     zpl_bytes = construir_zpl_etiquetas(
         bienes, anio, nombre_institucion, dpi, columnas, ancho_mm, alto_mm,
-        gap_mm, margen_izq_mm, darkness, speed
+        gap_mm, margen_izq_mm, darkness, speed, qr_mag, offset_x_mm
     ).encode('utf-8')
 
     nombre_impresora = (getattr(settings, 'ZEBRA_PRINTER_NAME', '') or '').strip()

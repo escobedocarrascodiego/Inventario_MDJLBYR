@@ -9,6 +9,7 @@ from organizacion.models import Local, Area, Oficina, UbicacionFisica
 from personal.models import Personal
 from bienes.models import Bien
 from .models import TrasladoBien, EscaneoCodigoBarra
+from inventario.permisos import permiso_requerido
 
 
 # ==============================================================================
@@ -51,6 +52,7 @@ def _serialize_escaneo(escaneo):
 # MÓDULO DE ESCANEO DE CÓDIGOS DE BARRAS
 # ==============================================================================
 
+@permiso_requerido('traslados.add_trasladobien')
 def escanear_codigos_barras(request):
     """Vista principal para escanear códigos de barras y preparar traslados."""
     session_key = _get_request_session_key(request)
@@ -69,6 +71,7 @@ def escanear_codigos_barras(request):
     })
 
 
+@permiso_requerido('traslados.add_trasladobien')
 @require_http_methods(["POST"])
 def registrar_escaneo_codigo(request):
     """Registra un código escaneado y lo guarda en la lista temporal."""
@@ -123,6 +126,7 @@ def registrar_escaneo_codigo(request):
     })
 
 
+@permiso_requerido('traslados.add_trasladobien')
 @require_http_methods(["POST"])
 def eliminar_escaneo_codigo(request, pk):
     """Elimina un escaneo pendiente de la lista."""
@@ -137,6 +141,7 @@ def eliminar_escaneo_codigo(request, pk):
     return JsonResponse({'success': True})
 
 
+@permiso_requerido('traslados.add_trasladobien')
 @require_http_methods(["POST"])
 def limpiar_escaneos_codigo(request):
     """Limpia todos los escaneos pendientes de la sesión."""
@@ -148,6 +153,7 @@ def limpiar_escaneos_codigo(request):
     return JsonResponse({'success': True})
 
 
+@permiso_requerido('traslados.add_trasladobien')
 @require_http_methods(["POST"])
 def ejecutar_traslado_escaneados(request):
     """Ejecuta el traslado de todos los bienes escaneados pendientes."""
@@ -288,6 +294,7 @@ def ejecutar_traslado_escaneados(request):
 # MÓDULO DE TRASLADO DE BIENES (MANUAL)
 # ==============================================================================
 
+@permiso_requerido('traslados.add_trasladobien')
 def traslado_bienes_index(request):
     """Vista principal para el formulario de traslado de bienes"""
     locales = Local.objects.all().order_by('nombre')
@@ -397,6 +404,7 @@ def obtener_ubicacion_usuario(request, pk):
         return JsonResponse({'error': 'Usuario no encontrado.'}, status=404)
 
 
+@permiso_requerido('traslados.add_trasladobien')
 @require_http_methods(["POST"])
 def ejecutar_traslado(request):
     """Vista para ejecutar el traslado de bienes"""

@@ -7,58 +7,161 @@
 
 {% block content %}
 <div class="card mb-4">
-    <div class="card-header bg-info text-white">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-box me-2"></i>Información del Bien</h5>
+        <span class="badge bg-light text-dark fs-6">{{ bien.codigo_patrimonial }}</span>
     </div>
     <div class="card-body">
+
+        <!-- ============ IDENTIFICACIÓN ============ -->
+        <h6 class="text-info border-bottom pb-2 mb-3">
+            <i class="fas fa-fingerprint me-2"></i>Identificación
+        </h6>
         <div class="row">
             <div class="col-md-6">
-                <p><strong>Código Patrimonial:</strong> {{ bien.codigo_patrimonial }}</p>
-                <p><strong>Descripción:</strong> {{ bien.descripcion }}</p>
-                <p><strong>Marca/Modelo:</strong> {{ bien.marca|default:"-" }} {{ bien.modelo|default:"" }}</p>
-                <p><strong>Tasa de Depreciación:</strong> 
-                    {% if bien.tasa_depreciacion is not None %}
-                        {{ bien.tasa_depreciacion|floatformat:2 }}%
-                    {% else %}
-                        <span class="text-muted">-</span>
-                    {% endif %}
-                </p>
+                <p><strong>Código Patrimonial:</strong> {{ bien.codigo_patrimonial|default:"-" }}</p>
+                <p><strong>Código Interno:</strong> {{ bien.codigo_interno|default:"-" }}</p>
+                <p><strong>Denominación:</strong> {{ bien.descripcion|default:"-" }}</p>
             </div>
             <div class="col-md-6">
-                <p><strong>Estado:</strong> 
-                    <span class="badge 
+                <p><strong>Grupo Genérico:</strong> {{ bien.grupo_generico|default:"-" }}</p>
+                <p><strong>Clase:</strong> {{ bien.clase|default:"-" }}</p>
+                <p><strong>Situación:</strong>
+                    <span class="badge {% if bien.situacion == 'USO' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                        {{ bien.get_situacion_display }}
+                    </span>
+                    <span class="ms-2"><strong>Estado:</strong></span>
+                    <span class="badge
                         {% if bien.estado == 'NUEVO' %}bg-success
                         {% elif bien.estado == 'BUENO' %}bg-info
-                        {% elif bien.estado == 'REGULAR' %}bg-warning
+                        {% elif bien.estado == 'REGULAR' %}bg-warning text-dark
                         {% elif bien.estado == 'MALO' %}bg-danger
+                        {% elif bien.estado == 'BAJA' %}bg-dark
                         {% else %}bg-secondary{% endif %}">
                         {{ bien.get_estado_display }}
                     </span>
                 </p>
-                <p><strong>Valor Neto:</strong> S/ {{ bien.valor_neto|floatformat:2 }}</p>
-                <p><strong>Vida Útil (meses):</strong> 
-                    {% if bien.vida_util_meses is not None %}
-                        {{ bien.vida_util_meses }}
+            </div>
+        </div>
+
+        <!-- ============ ADQUISICIÓN ============ -->
+        <h6 class="text-info border-bottom pb-2 mb-3 mt-3">
+            <i class="fas fa-file-invoice-dollar me-2"></i>Datos de Adquisición
+        </h6>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Forma de Adquisición:</strong> {{ bien.get_forma_adquisicion_display }}</p>
+                <p><strong>Resolución de Alta / Orden de Compra:</strong>
+                    {% if bien.resolucion_alta %}
+                        {{ bien.resolucion_alta }}
                     {% else %}
                         <span class="text-muted">-</span>
                     {% endif %}
                 </p>
-                <p><strong>Fecha PECOSA / Salida:</strong> 
-                    {% if bien.fecha_pecosa %}
-                        {{ bien.fecha_pecosa|date:'d/m/Y' }}
-                    {% else %}
-                        <span class="text-muted">-</span>
-                    {% endif %}
+            </div>
+            <div class="col-md-6">
+                <p><strong>Fecha de Adquisición:</strong>
+                    {% if bien.fecha_adquisicion %}{{ bien.fecha_adquisicion|date:'d/m/Y' }}{% else %}<span class="text-muted">-</span>{% endif %}
                 </p>
-                <p><strong>Usuario Actual:</strong> 
+                <p><strong>Fecha PECOSA / Salida:</strong>
+                    {% if bien.fecha_pecosa %}{{ bien.fecha_pecosa|date:'d/m/Y' }}{% else %}<span class="text-muted">-</span>{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- ============ CONTABILIDAD Y VALORES ============ -->
+        <h6 class="text-info border-bottom pb-2 mb-3 mt-3">
+            <i class="fas fa-calculator me-2"></i>Contabilidad y Valores
+        </h6>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Tipo de Cuenta:</strong> {{ bien.get_tipo_cuenta_display }}</p>
+                <p><strong>Cuenta Contable:</strong> {{ bien.cuenta_contable|default:"-" }}</p>
+                <p><strong>Tasa de Depreciación:</strong>
+                    {% if bien.tasa_depreciacion is not None %}{{ bien.tasa_depreciacion|floatformat:2 }}%{% else %}<span class="text-muted">-</span>{% endif %}
+                </p>
+                <p><strong>Vida Útil (meses):</strong>
+                    {% if bien.vida_util_meses is not None %}{{ bien.vida_util_meses }}{% else %}<span class="text-muted">-</span>{% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Valor de Adquisición:</strong> S/ {{ bien.valor_adquisicion|floatformat:2 }}</p>
+                <p><strong>Depreciación Acumulada:</strong> S/ {{ depreciacion.depreciacion_acumulada|floatformat:2 }}</p>
+                <p><strong>Valor Neto Actual:</strong>
+                    <span class="fw-bold text-success">S/ {{ depreciacion.valor_neto|floatformat:2 }}</span>
+                </p>
+                {% if not depreciacion.depreciable and depreciacion.motivo_no_depreciable %}
+                    <p class="mb-0"><small class="text-muted"><i class="fas fa-info-circle me-1"></i>No deprecia: {{ depreciacion.motivo_no_depreciable }}</small></p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ============ UBICACIÓN Y ASIGNACIÓN ============ -->
+        <h6 class="text-info border-bottom pb-2 mb-3 mt-3">
+            <i class="fas fa-map-marker-alt me-2"></i>Ubicación y Asignación Actual
+        </h6>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Usuario Asignado:</strong>
                     {% if bien.usuario_asignado %}
                         {{ bien.usuario_asignado }}
+                        {% if bien.usuario_asignado.cargo %}<br><small class="text-muted">{{ bien.usuario_asignado.cargo }}</small>{% endif %}
+                        <br><small class="text-muted">{{ bien.usuario_asignado.get_tipo_documento_display }}: {{ bien.usuario_asignado.numero_documento }}</small>
                     {% else %}
                         <span class="text-muted">Sin asignar</span>
                     {% endif %}
                 </p>
+                <p><strong>Local:</strong> {{ bien.local|default:"-" }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Área:</strong> {{ bien.area|default:"-" }}</p>
+                <p><strong>Oficina:</strong> {{ bien.oficina|default:"-" }}</p>
+                <p><strong>Ubicación Física:</strong> {{ bien.ubicacion_fisica|default:"-" }}</p>
             </div>
         </div>
+
+        <!-- ============ DETALLES TÉCNICOS ============ -->
+        <h6 class="text-info border-bottom pb-2 mb-3 mt-3">
+            <i class="fas fa-cogs me-2"></i>Detalles Técnicos
+        </h6>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Marca:</strong> {{ bien.marca|default:"-" }}</p>
+                <p><strong>Modelo:</strong> {{ bien.modelo|default:"-" }}</p>
+                <p><strong>Color:</strong> {{ bien.color|default:"-" }}</p>
+                <p><strong>Serie:</strong> {{ bien.serie|default:"-" }}</p>
+                <p><strong>Dimensión:</strong> {{ bien.dimension|default:"-" }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Placa:</strong> {{ bien.placa|default:"-" }}</p>
+                <p><strong>N° Motor:</strong> {{ bien.numero_motor|default:"-" }}</p>
+                <p><strong>N° Chasis:</strong> {{ bien.numero_chasis|default:"-" }}</p>
+                <p><strong>Año de Fabricación:</strong> {{ bien.anio_fabricacion|default:"-" }}</p>
+            </div>
+        </div>
+        {% if bien.otros_detalles %}
+            <p><strong>Otros Detalles:</strong> {{ bien.otros_detalles }}</p>
+        {% endif %}
+
+        <!-- ============ BAJA (si aplica) ============ -->
+        {% if baja %}
+            <h6 class="text-danger border-bottom pb-2 mb-3 mt-3">
+                <i class="fas fa-ban me-2"></i>Información de Baja
+            </h6>
+            <div class="alert alert-danger mb-0">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Resolución de Baja:</strong> {{ baja.resolucion_baja }}</p>
+                        <p class="mb-2"><strong>Fecha de Resolución:</strong> {{ baja.fecha_resolucion|date:'d/m/Y' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Causal:</strong> {{ baja.get_causal_baja_display }}</p>
+                        <p class="mb-0"><strong>Doc. SBN N°:</strong> {{ baja.documento_sbn|default:"-" }}</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
     </div>
 </div>
 

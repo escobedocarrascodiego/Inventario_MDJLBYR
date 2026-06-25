@@ -9,9 +9,11 @@
 <div class="card">
     <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Lista de Locales</h5>
+        {% if perms.organizacion.add_local %}
         <a href="{% url 'inventario:local_create' %}" class="btn btn-dark btn-sm">
             <i class="fas fa-plus me-1"></i>Nuevo Local
         </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <!-- Barra de búsqueda -->
@@ -57,17 +59,21 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{% url 'inventario:local_update' local.pk %}" 
-                                   class="btn btn-outline-primary" 
+                                {% if perms.organizacion.change_local %}
+                                <a href="{% url 'inventario:local_update' local.pk %}"
+                                   class="btn btn-outline-primary"
                                    title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{% url 'inventario:local_delete' local.pk %}" 
-                                   class="btn btn-outline-danger" 
+                                {% endif %}
+                                {% if perms.organizacion.delete_local %}
+                                <a href="{% url 'inventario:local_delete' local.pk %}"
+                                   class="btn btn-outline-danger"
                                    title="Eliminar"
                                    onclick="return confirm('¿Está seguro de eliminar este local?');">
                                     <i class="fas fa-trash"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

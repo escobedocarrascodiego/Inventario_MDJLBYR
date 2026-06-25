@@ -61,7 +61,17 @@
       "Bash(./venv/Scripts/python.exe manage.py showmigrations catalogos)",
       "Bash(./venv/Scripts/python.exe manage.py recalcular_valores_netos --help)",
       "Bash(./venv/Scripts/python.exe manage.py migrate bienes)",
-      "Bash(./venv/Scripts/python.exe manage.py recalcular_valores_netos)"
+      "Bash(./venv/Scripts/python.exe manage.py recalcular_valores_netos)",
+      "Bash(python manage.py check)",
+      "Bash(./venv/Scripts/python.exe manage.py inicializar_accesos)",
+      "Bash(./venv/Scripts/python.exe manage.py shell -c \"from django.contrib.auth import get_user_model; U=get_user_model\\(\\); u=U.objects.get\\(username='admin'\\); u.set_password\\('Admin123'\\); u.is_staff=True; u.is_superuser=True; u.save\\(\\); print\\('OK admin actualizado | is_staff=', u.is_staff, '| is_superuser=', u.is_superuser\\)\")",
+      "Bash(./venv/Scripts/python.exe manage.py shell)",
+      "Bash(python _tmp_zpl_check.py)",
+      "Bash(python -m pip show django)",
+      "Bash(./venv/Scripts/python.exe _tmp_zpl_check.py)",
+      "Bash(curl -s --max-time 25 --request POST \"http://api.labelary.com/v1/printers/8dpmm/labels/4.2x1/0/\" --data-binary @_tmp_etiqueta.zpl --header \"Accept: image/png\" -o _tmp_etiqueta.png)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(./venv/Scripts/python.exe _tmp_measure.py)"
     ]
   }
 }

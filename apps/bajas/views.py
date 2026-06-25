@@ -15,6 +15,7 @@ from bienes.models import Bien
 from bienes.forms import BuscarBienForm
 from .models import BajaBien
 from .forms import BajaBienForm
+from inventario.permisos import permiso_requerido
 
 
 # ==============================================================================
@@ -43,6 +44,7 @@ def baja_bienes_list(request):
     })
 
 
+@permiso_requerido('bajas.add_bajabien')
 def baja_bien_create(request):
     """Vista para registrar la baja de un bien"""
     buscar_form = BuscarBienForm(request.GET or None)

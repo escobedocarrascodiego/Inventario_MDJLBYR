@@ -254,10 +254,27 @@
                         </div>
                     </div>
                     
+                    <!-- SECCIÓN: INGRESO POR GRUPO (CANTIDAD) -->
+                    {% if not form.instance.pk %}
+                    <div id="bloque-ingreso-grupo" class="alert alert-info mb-4" style="display: none;">
+                        <h6 class="mb-2"><i class="fas fa-cubes me-2"></i><strong>Ingreso X Grupo</strong></h6>
+                        <p class="mb-2">
+                            Se registrarán varios bienes con los <strong>mismos datos</strong>.
+                            Cada uno recibirá automáticamente su propio <strong>código patrimonial</strong> correlativo.
+                        </p>
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label mb-1"><strong>Cantidad a registrar:</strong></label>
+                                {{ form.cantidad }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Botones de acción -->
                     <div class="d-flex justify-content-between mt-4">
                         <div>
-                            <button type="button" class="btn btn-info me-2" id="btn-ingreso-unidad">
+                            <button type="button" class="btn btn-info me-2 active" id="btn-ingreso-unidad">
                                 <i class="fas fa-cube me-1"></i>Ingreso X Unidad
                             </button>
                             <button type="button" class="btn btn-outline-info" id="btn-ingreso-grupo">
@@ -553,6 +570,31 @@ $(document).ready(function() {
         }
     }, 300);
     
+    // ===== INGRESO X UNIDAD / X GRUPO =====
+    const bloqueGrupo = $('#bloque-ingreso-grupo');
+    const cantidadInput = $('#id_cantidad');
+    const btnUnidad = $('#btn-ingreso-unidad');
+    const btnGrupo = $('#btn-ingreso-grupo');
+
+    btnGrupo.on('click', function() {
+        bloqueGrupo.show();
+        btnGrupo.removeClass('btn-outline-info').addClass('btn-info active');
+        btnUnidad.removeClass('btn-info active').addClass('btn-outline-info');
+        if (!cantidadInput.val() || parseInt(cantidadInput.val(), 10) < 1) {
+            cantidadInput.val(2);
+        } else if (parseInt(cantidadInput.val(), 10) < 2) {
+            cantidadInput.val(2);
+        }
+        cantidadInput.focus().select();
+    });
+
+    btnUnidad.on('click', function() {
+        bloqueGrupo.hide();
+        cantidadInput.val(1);
+        btnUnidad.removeClass('btn-outline-info').addClass('btn-info active');
+        btnGrupo.removeClass('btn-info active').addClass('btn-outline-info');
+    });
+
     // Validar que se haya seleccionado una denominación antes de enviar
     $('#form-bien').on('submit', function(e) {
         if (!denominacionHidden.val()) {
@@ -560,6 +602,22 @@ $(document).ready(function() {
             alert('Por favor seleccione una denominación del catálogo');
             buscarInput.focus();
             return false;
+        }
+        // Si está en modo grupo, confirmar la cantidad a registrar
+        if (bloqueGrupo.is(':visible')) {
+            const cantidad = parseInt(cantidadInput.val(), 10);
+            if (!cantidad || cantidad < 1) {
+                e.preventDefault();
+                alert('Ingrese una cantidad válida (1 o más).');
+                cantidadInput.focus();
+                return false;
+            }
+            if (cantidad > 1) {
+                if (!confirm('Se registrarán ' + cantidad + ' bienes con estos mismos datos. ¿Desea continuar?')) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
         }
     });
     

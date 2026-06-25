@@ -21,6 +21,7 @@ from personal.models import Personal
 from catalogos.models import CuentaContable, Denominacion
 from .models import Bien, ParametroSistema, HistoricoDepreciacion, validar_cierre_anterior
 from .forms import BienForm
+from inventario.permisos import PermisoRequeridoMixin, solo_superusuario
 
 
 # ==============================================================================
@@ -185,6 +186,7 @@ def consulta_historica(request):
 # CIERRE DE AÑO FISCAL
 # ==============================================================================
 
+@solo_superusuario
 def cierre_anio_fiscal(request):
     """Cierre de año fiscal para congelar historial."""
     parametros = ParametroSistema.objects.order_by('anio_fiscal')
@@ -248,6 +250,7 @@ def cierre_anio_fiscal(request):
 # IMPORTACIÓN MASIVA DE INVENTARIO
 # ==============================================================================
 
+@solo_superusuario
 def importar_inventario_view(request):
     """Importa bienes desde un CSV y retorna resultados."""
     if request.method != 'POST':
@@ -552,6 +555,7 @@ def descargar_plantilla_carga(request):
     return response
 
 
+@solo_superusuario
 def descargar_errores_importacion(request):
     """Descarga un Excel con filas que fallaron en la importación."""
     data = request.session.get('import_failed_rows')
@@ -600,7 +604,8 @@ class BienListView(ListView):
         return context
 
 
-class BienCreateView(SuccessMessageMixin, CreateView):
+class BienCreateView(PermisoRequeridoMixin, SuccessMessageMixin, CreateView):
+    permission_required = 'bienes.add_bien'
     model = Bien
     form_class = BienForm
     template_name = 'inventario/bien_form.html'
@@ -613,8 +618,49 @@ class BienCreateView(SuccessMessageMixin, CreateView):
         context['action'] = 'Crear'
         return context
 
+    def form_valid(self, form):
+        """Permite el "Ingreso X Grupo": si la cantidad es mayor a 1 se crean
+        N bienes idénticos. Cada uno se guarda por separado para que el método
+        ``Bien.save()`` autogenere un código patrimonial correlativo distinto.
+        """
+        cantidad = form.cleaned_data.get('cantidad') or 1
+        try:
+            cantidad = int(cantidad)
+        except (TypeError, ValueError):
+            cantidad = 1
+        cantidad = max(1, cantidad)
 
-class BienUpdateView(SuccessMessageMixin, UpdateView):
+        if cantidad == 1:
+            return super().form_valid(form)
+
+        # Datos del bien (solo los campos del modelo, sin 'cantidad' ni 'buscar_denominacion')
+        base_data = {
+            campo: form.cleaned_data[campo]
+            for campo in form._meta.fields
+            if campo in form.cleaned_data
+        }
+
+        ultimo_bien = None
+        with transaction.atomic():
+            for _ in range(cantidad):
+                bien = Bien(**base_data)
+                # Forzar la generación de un nuevo código patrimonial correlativo
+                bien.pk = None
+                bien.correlativo = 0
+                bien.codigo_patrimonial = None
+                bien.save()
+                ultimo_bien = bien
+
+        self.object = ultimo_bien
+        messages.success(
+            self.request,
+            f"Se registraron {cantidad} bienes correctamente (Ingreso X Grupo)."
+        )
+        return redirect(self.get_success_url())
+
+
+class BienUpdateView(PermisoRequeridoMixin, SuccessMessageMixin, UpdateView):
+    permission_required = 'bienes.change_bien'
     model = Bien
     form_class = BienForm
     template_name = 'inventario/bien_form.html'
@@ -628,7 +674,8 @@ class BienUpdateView(SuccessMessageMixin, UpdateView):
         return context
 
 
-class BienDeleteView(SuccessMessageMixin, DeleteView):
+class BienDeleteView(PermisoRequeridoMixin, SuccessMessageMixin, DeleteView):
+    permission_required = 'bienes.delete_bien'
     model = Bien
     template_name = 'inventario/bien_confirm_delete.html'
     success_url = reverse_lazy('inventario:bien_list')
@@ -705,10 +752,19 @@ def bien_historial(request, pk):
             'tipo': 'sin_historial',
             'observaciones': 'No se registran traslados para este bien'
         })
-    
+
+    # Desglose de depreciación a la fecha actual (valor de adquisición,
+    # depreciación acumulada y valor neto) usando la fuente única del modelo.
+    depreciacion = bien.calcular_depreciacion()
+
+    # Información de baja, si el bien fue dado de baja.
+    baja = getattr(bien, 'baja', None)
+
     return render(request, 'inventario/bien_historial.html', {
         'bien': bien,
-        'historial': historial
+        'historial': historial,
+        'depreciacion': depreciacion,
+        'baja': baja,
     })
 
 
@@ -904,15 +960,32 @@ def bienes_datatable(request):
         edit_url = reverse('inventario:bien_update', args=[bien.pk])
         historial_url = reverse('inventario:bien_historial', args=[bien.pk])
         traslado_url = reverse('inventario:traslado_bienes_index')
-        acciones = (
-            '<div class="btn-group btn-group-sm" role="group">'
-            f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
-            '<i class="fas fa-edit"></i></a>'
+
+        # El botón Editar solo se muestra a quien puede modificar bienes
+        # (Administrador) y el de Trasladar a quien puede registrar traslados
+        # (Administrador y Trabajador). El Historial es visible para todos.
+        puede_editar = request.user.has_perm('bienes.change_bien')
+        puede_trasladar = request.user.has_perm('traslados.add_trasladobien')
+
+        botones = []
+        if puede_editar:
+            botones.append(
+                f'<a href="{edit_url}" class="btn btn-outline-primary" title="Editar">'
+                '<i class="fas fa-edit"></i></a>'
+            )
+        botones.append(
             f'<a href="{historial_url}" class="btn btn-outline-info" title="Ver Historial">'
             '<i class="fas fa-history"></i></a>'
-            f'<a href="{traslado_url}?bien_id={bien.pk}" class="btn btn-outline-success" title="Trasladar">'
-            '<i class="fas fa-exchange-alt"></i></a>'
-            '</div>'
+        )
+        if puede_trasladar:
+            botones.append(
+                f'<a href="{traslado_url}?bien_id={bien.pk}" class="btn btn-outline-success" title="Trasladar">'
+                '<i class="fas fa-exchange-alt"></i></a>'
+            )
+        acciones = (
+            '<div class="btn-group btn-group-sm" role="group">'
+            + ''.join(botones)
+            + '</div>'
         )
 
         data.append([
@@ -1116,6 +1189,32 @@ def buscar_bien_etiquetas(request):
         for bien in bienes
     ]
 
+    return JsonResponse({'results': results})
+
+
+@require_http_methods(["GET"])
+def buscar_resolucion_etiquetas(request):
+    """Vista AJAX: lista las órdenes de compra / resoluciones de alta que coinciden.
+
+    Devuelve valores DISTINTOS de ``resolucion_alta`` (texto libre del bien) para
+    poblar el buscador de etiquetas. El value de cada opción es la misma cadena,
+    porque luego se filtran los bienes por igualdad exacta de ese texto.
+    """
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    valores = (
+        Bien.objects.exclude(estado='BAJA')
+        .filter(resolucion_alta__icontains=query)
+        .exclude(resolucion_alta__isnull=True)
+        .exclude(resolucion_alta='')
+        .values_list('resolucion_alta', flat=True)
+        .distinct()
+        .order_by('resolucion_alta')[:20]
+    )
+
+    results = [{'id': valor, 'text': valor} for valor in valores]
     return JsonResponse({'results': results})
 
 

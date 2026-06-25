@@ -59,6 +59,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Exige sesión iniciada en TODO el sistema. Las pocas vistas públicas
+    # (login) se marcan con @login_not_required. Debe ir DESPUÉS de
+    # AuthenticationMiddleware.
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -119,6 +123,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# =============================================================
+# Autenticación / Control de acceso
+# =============================================================
+# A dónde se redirige al usuario sin sesión (LoginRequiredMiddleware lo usa).
+LOGIN_URL = 'login'
+# A dónde se va tras iniciar sesión correctamente.
+LOGIN_REDIRECT_URL = 'inventario:home'
+# A dónde se va tras cerrar sesión.
+LOGOUT_REDIRECT_URL = 'login'
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -168,12 +183,26 @@ ZEBRA_PRINTER_DARKNESS = 30
 # Velocidad de impresión en mm/s (None = no tocar). Imprimir más lento también
 # oscurece. La ZT411 admite 51, 76, 102, 127, 152, etc.
 ZEBRA_PRINTER_SPEED = None
+# Tamaño del QR (magnificación de cada módulo). Como el QR lleva todos los datos
+# en JSON, este es el modo de hacerlo más chico/grande SIN quitar información:
+#   1 = QR pequeño (~7 mm), ocupa poco pero los cuadritos son finos -> PRUEBA el
+#       escaneo con el celular; si cuesta leerlo, súbelo a 2.
+#   2 = QR mediano (~13 mm), lectura más segura.
+ZEBRA_QR_MAGNIFICACION = 2
+
+# Desplazamiento GLOBAL de TODA la impresión, en mm (puede ser negativo).
+# Sirve cuando el papel está montado un poco corrido y todo sale pegado a un
+# lado. NO confundir con ZEBRA_LABEL_MARGEN_IZQ_MM (que es el margen interno de
+# cada etiqueta): este mueve TODO el conjunto de las 2 etiquetas a la vez.
+#   Positivo  -> mueve todo a la DERECHA.
+#   Negativo  -> mueve todo a la IZQUIERDA.
+ZEBRA_OFFSET_GLOBAL_X_MM = 0.0
 
 # Geometría física del rollo de etiquetas (en milímetros).
 # El rollo viene con varias etiquetas por fila (columnas). Cada avance del
 # papel imprime una fila completa de etiquetas.
 ZEBRA_LABEL_COLUMNAS = 2     # Cuántas etiquetas hay lado a lado en el rollo
-ZEBRA_LABEL_ANCHO_MM = 50    # Ancho de cada etiqueta (5 cm)
+ZEBRA_LABEL_ANCHO_MM = 51    # Ancho de cada etiqueta (5 cm)
 ZEBRA_LABEL_ALTO_MM = 25     # Alto de cada etiqueta (2.5 cm)
-ZEBRA_LABEL_GAP_MM = 2       # Separación horizontal entre columnas (ajústalo si descuadra)
-ZEBRA_LABEL_MARGEN_IZQ_MM = 5.0  # Margen izquierdo del logo/QR (súbelo si salen cortados)
+ZEBRA_LABEL_GAP_MM = 3       # Separación horizontal entre las dos etiquetas (3 mm reales)
+ZEBRA_LABEL_MARGEN_IZQ_MM = 6.5  # Margen izquierdo del logo/QR (súbelo si salen cortados)
