@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoGeneracion = document.getElementById('id_tipo_generacion');
     const campoAño = document.getElementById('campo-año');
     const campoBien = document.getElementById('campo-bien');
+    const campoDenominacion = document.getElementById('campo-denominacion');
     const campoUsuario = document.getElementById('campo-usuario');
     const campoLocal = document.getElementById('campo-local');
     const campoArea = document.getElementById('campo-area');
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function toggleCampos() {
         // Ocultar todos los campos primero
         campoBien.style.display = 'none';
+        campoDenominacion.style.display = 'none';
         campoUsuario.style.display = 'none';
         campoLocal.style.display = 'none';
         campoArea.style.display = 'none';
@@ -78,6 +80,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const valor = tipoGeneracion.value;
         if (valor === 'bien_especifico') {
             campoBien.style.display = 'block';
+        } else if (valor === 'por_denominacion') {
+            campoDenominacion.style.display = 'block';
         } else if (valor === 'por_usuario') {
             campoUsuario.style.display = 'block';
         } else if (valor === 'por_local') {
@@ -177,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     configurarBuscador('bien-search', 'bien-search-btn', 'id_bien', 'Seleccione un bien');
+    configurarBuscador('denominacion-search', 'denominacion-search-btn', 'id_denominacion', 'Seleccione una denominación');
     configurarBuscador('usuario-search', 'usuario-search-btn', 'id_usuario', 'Seleccione un usuario');
     configurarBuscador('resolucion-search', 'resolucion-search-btn', 'id_resolucion_alta', 'Seleccione una orden de compra / resolución');
 

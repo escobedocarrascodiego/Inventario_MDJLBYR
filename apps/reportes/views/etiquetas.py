@@ -61,6 +61,11 @@ def _filtrar_bienes(form_data):
         if not bien:
             return None, "Debe seleccionar un bien específico."
         bienes = bienes.filter(id=bien.id)
+    elif tipo_generacion == 'por_denominacion':
+        denominacion = form_data.get('denominacion')
+        if not denominacion:
+            return None, "Debe seleccionar una denominación."
+        bienes = bienes.filter(denominacion=denominacion)
     elif tipo_generacion == 'por_usuario':
         usuario = form_data.get('usuario')
         if not usuario:

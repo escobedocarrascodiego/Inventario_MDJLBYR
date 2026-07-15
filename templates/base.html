@@ -155,6 +155,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            transition: margin-left .3s cubic-bezier(.4,0,.2,1);
         }
 
         .topbar {
@@ -183,13 +184,21 @@
             gap: .75rem;
         }
         .topbar .btn-toggle-sidebar {
-            display: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border: none;
             background: none;
             font-size: 1.15rem;
             color: #475569;
             padding: .25rem .5rem;
+            border-radius: .4rem;
             cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+        .topbar .btn-toggle-sidebar:hover {
+            background: #f1f5f9;
+            color: #1e293b;
         }
 
         .page-content {
@@ -241,12 +250,19 @@
             letter-spacing: .03em;
         }
 
+        /* ===== SIDEBAR COLAPSADA (escritorio) ===== */
+        /* Al pulsar el botón en escritorio se oculta la barra y el contenido
+           ocupa todo el ancho (útil para tablas anchas). */
+        @media (min-width: 992px) {
+            body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+            body.sidebar-collapsed .main-wrap { margin-left: 0; }
+        }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 991.98px) {
             .sidebar { transform: translateX(-100%); }
             .sidebar.show { transform: translateX(0); }
             .main-wrap { margin-left: 0; }
-            .topbar .btn-toggle-sidebar { display: inline-flex; }
             .page-content { padding: 1rem; }
         }
 
@@ -263,6 +279,19 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Restaura el estado colapsado de la barra (escritorio) antes de pintar,
+         para evitar un salto/parpadeo al cargar la página. -->
+    <script>
+        (function(){
+            try {
+                var esEscritorio = window.matchMedia('(min-width: 992px)').matches;
+                if (esEscritorio && localStorage.getItem('sidebarCollapsed') === '1') {
+                    document.body.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
+
     <!-- Overlay for mobile sidebar -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -407,12 +436,37 @@
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
 
+            function esEscritorio(){
+                return window.matchMedia('(min-width: 992px)').matches;
+            }
+
+            // Reajusta el ancho de columnas de cualquier DataTable tras la
+            // animación de la barra (para que la tabla aproveche el nuevo ancho).
+            function ajustarTablas(){
+                if (window.jQuery && $.fn.dataTable) {
+                    setTimeout(function(){
+                        $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+                    }, 320);
+                }
+            }
+
             function toggle(){
-                sidebar.classList.toggle('show');
-                overlay.classList.toggle('show');
+                if (esEscritorio()) {
+                    // Escritorio: oculta/muestra la barra y recuerda la preferencia.
+                    const colapsada = document.body.classList.toggle('sidebar-collapsed');
+                    try { localStorage.setItem('sidebarCollapsed', colapsada ? '1' : '0'); } catch (e) {}
+                } else {
+                    // Móvil: panel deslizante con fondo oscuro.
+                    sidebar.classList.toggle('show');
+                    overlay.classList.toggle('show');
+                }
+                ajustarTablas();
             }
             btn?.addEventListener('click', toggle);
-            overlay?.addEventListener('click', toggle);
+            overlay?.addEventListener('click', function(){
+                sidebar.classList.remove('show');
+                overlay.classList.remove('show');
+            });
 
             // Auto-expand catalogos submenu if current link is active
             const subCatalogos = document.getElementById('subCatalogos');

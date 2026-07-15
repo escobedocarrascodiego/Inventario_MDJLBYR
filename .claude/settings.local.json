@@ -71,7 +71,10 @@
       "Bash(./venv/Scripts/python.exe _tmp_zpl_check.py)",
       "Bash(curl -s --max-time 25 --request POST \"http://api.labelary.com/v1/printers/8dpmm/labels/4.2x1/0/\" --data-binary @_tmp_etiqueta.zpl --header \"Accept: image/png\" -o _tmp_etiqueta.png)",
       "Bash(echo \"exit=$?\")",
-      "Bash(./venv/Scripts/python.exe _tmp_measure.py)"
+      "Bash(./venv/Scripts/python.exe _tmp_measure.py)",
+      "Bash(./venv/Scripts/python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\dbf416bf-3604-4571-9fa4-2517d078a60c\\\\scratchpad\\\\test_denom.py\")",
+      "Bash(cp \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\dbf416bf-3604-4571-9fa4-2517d078a60c\\\\scratchpad\\\\test_denom.py\" _tmp_test_denom.py)",
+      "Bash(./venv/Scripts/python.exe _tmp_test_denom.py)"
     ]
   }
 }

@@ -6,7 +6,7 @@ from django.conf import settings
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from datetime import datetime
@@ -572,8 +572,10 @@ def datos_personal_anexo03(request):
     )
 
     local_nombre = ''
+    direccion = ''
     if personal.area and personal.area.local:
         local_nombre = personal.area.local.nombre
+        direccion = personal.area.local.direccion or ''
 
     return JsonResponse({
         'id': personal.id,
@@ -582,6 +584,7 @@ def datos_personal_anexo03(request):
         'area': personal.area.nombre if personal.area else '',
         'oficina': personal.oficina.nombre if personal.oficina else '',
         'local': local_nombre,
+        'direccion': direccion,
         'cargo': personal.cargo or '',
     })
 
@@ -623,7 +626,6 @@ def generar_ficha_anexo03(request):
     bien_ids = request.POST.getlist('bien_ids')
     entidad_input = (request.POST.get('entidad') or '').strip()
     correo = (request.POST.get('correo') or '').strip()
-    direccion = (request.POST.get('direccion') or '').strip()
     fecha_str = (request.POST.get('fecha') or '').strip()
 
     if not personal_id or not bien_ids:
@@ -649,8 +651,11 @@ def generar_ficha_anexo03(request):
         fecha_ficha = datetime.now().date()
 
     # Datos institucionales / ubicación
+    local_obj = personal.area.local if (personal.area and personal.area.local) else None
     area_nombre = personal.area.nombre if personal.area else ''
-    local_nombre = personal.area.local.nombre if (personal.area and personal.area.local) else ''
+    local_nombre = local_obj.nombre if local_obj else ''
+    # La dirección se toma del Local o sede (no es la dirección del trabajador).
+    direccion = local_obj.direccion if (local_obj and local_obj.direccion) else ''
     entidad_nombre = entidad_input or (
         personal.area.local.entidad.nombre
         if personal.area and personal.area.local and personal.area.local.entidad
@@ -865,9 +870,6 @@ def generar_ficha_anexo03(request):
         fontSize=9, fontName='Helvetica-Bold', alignment=TA_LEFT, leading=11,
         underlineWidth=0.5
     )
-    elements.append(Paragraph("<u><b>CONSIDERACIONES:</b></u>", consideraciones_titulo))
-    elements.append(Spacer(1, 0.15 * cm))
-
     consideraciones = [
         "El usuario es responsable de la permanencia y conservación de cada uno de los bienes descritos, recomendándose tomar las precauciones del caso para evitar sustracciones, deterioros, etc.",
         "Cualquier necesidad de traslado del bien mueble patrimonial dentro o fuera del local de la Entidad u Organización de la Entidad, es previamente comunicado al encargado de la OCP.",
@@ -877,9 +879,6 @@ def generar_ficha_anexo03(request):
         fontSize=8, fontName='Helvetica', alignment=TA_LEFT, leading=10,
         leftIndent=14, bulletIndent=4
     )
-    for item in consideraciones:
-        elements.append(Paragraph(f"➢ {item}", bullet_style))
-    elements.append(Spacer(1, 1.2 * cm))
 
     # Firmas
     firmas_data = [
@@ -893,7 +892,21 @@ def generar_ficha_anexo03(request):
         ('TOPPADDING', (0, 0), (-1, -1), 2),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ]))
-    elements.append(firmas_table)
+
+    # Bloque final: CONSIDERACIONES + espacio para firmar + firmas, todo unido
+    # con KeepTogether. Así las firmas NUNCA quedan solas en una hoja (si saltan
+    # de página, se llevan las consideraciones consigo) y el Spacer deja siempre
+    # un hueco encima de las líneas para que la persona pueda firmar.
+    bloque_final = [
+        Paragraph("<u><b>CONSIDERACIONES:</b></u>", consideraciones_titulo),
+        Spacer(1, 0.15 * cm),
+    ]
+    for item in consideraciones:
+        bloque_final.append(Paragraph(f"➢ {item}", bullet_style))
+    bloque_final.append(Spacer(1, 1.5 * cm))  # espacio en blanco para firmar
+    bloque_final.append(firmas_table)
+
+    elements.append(KeepTogether(bloque_final))
 
     doc.build(elements)
     return response

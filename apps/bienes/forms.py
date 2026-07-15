@@ -3,6 +3,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Submit, HTML, Div
 from organizacion.models import UbicacionFisica, Oficina, Local, Area
 from personal.models import Personal
+from catalogos.models import Denominacion
 from .models import Bien
 
 
@@ -252,6 +253,7 @@ class EtiquetaFiltroForm(forms.Form):
     TIPO_GENERACION = [
         ('todos', 'Todos los Bienes Activos'),
         ('bien_especifico', 'Bien Específico'),
+        ('por_denominacion', 'Por Denominación'),
         ('por_usuario', 'Por Usuario Asignado'),
         ('por_local', 'Por Local'),
         ('por_area', 'Por Área'),
@@ -299,6 +301,16 @@ class EtiquetaFiltroForm(forms.Form):
             'class': 'form-select',
             'id': 'id_bien',
             'data-ajax-url': '/ajax/buscar-bien-etiquetas/'
+        })
+    )
+
+    denominacion = forms.ChoiceField(
+        required=False,
+        label="Denominación",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_denominacion',
+            'data-ajax-url': '/ajax/buscar-denominacion-etiquetas/'
         })
     )
 
@@ -367,6 +379,16 @@ class EtiquetaFiltroForm(forms.Form):
                 choices.append((str(bien.id), f"{codigo} - {nombre}"))
         self.fields['bien'].choices = choices
 
+        # Precargar la opción de la denominación elegida (el value es su id) para
+        # que el ChoiceField valide el valor enviado vía AJAX (Select dinámico).
+        denominacion_id = (self.data.get('denominacion') or self.initial.get('denominacion') or '').strip()
+        denominacion_choices = [('', 'Seleccione una denominación')]
+        if denominacion_id.isdigit():
+            den = Denominacion.objects.filter(id=int(denominacion_id)).first()
+            if den:
+                denominacion_choices.append((str(den.id), den.nombre))
+        self.fields['denominacion'].choices = denominacion_choices
+
         # Precargar la opción del usuario seleccionado para que el ChoiceField
         # valide correctamente el valor enviado vía AJAX (Select dinámico).
         usuario_id = (self.data.get('usuario') or self.initial.get('usuario') or '').strip()
@@ -415,6 +437,25 @@ class EtiquetaFiltroForm(forms.Form):
             ),
             Row(
                 Column('bien', css_class='col-md-12 mt-2'),
+            ),
+            HTML('</div>'),
+            HTML('<div id="campo-denominacion" class="mt-3" style="display: none;">'),
+            Row(
+                Column(
+                    HTML(
+                        '<label class="form-label" for="denominacion-search">Buscar denominación</label>'
+                        '<div class="input-group">'
+                        '<input type="text" id="denominacion-search" class="form-control" '
+                        'placeholder="Ej: CPU, escritorio, silla, computadora..." autocomplete="off">'
+                        '<button type="button" id="denominacion-search-btn" class="btn btn-primary">'
+                        '<i class="fas fa-search me-1"></i>Buscar</button>'
+                        '</div>'
+                    ),
+                    css_class='col-md-12'
+                ),
+            ),
+            Row(
+                Column('denominacion', css_class='col-md-12 mt-2'),
             ),
             HTML('</div>'),
             HTML('<div id="campo-usuario" class="mt-3" style="display: none;">'),
@@ -493,6 +534,17 @@ class EtiquetaFiltroForm(forms.Form):
         if not bien:
             raise forms.ValidationError("Seleccione un bien válido.")
         return bien
+
+    def clean_denominacion(self):
+        denominacion_id = (self.cleaned_data.get('denominacion') or '').strip()
+        if not denominacion_id:
+            return None
+        if not denominacion_id.isdigit():
+            raise forms.ValidationError("Seleccione una denominación válida.")
+        den = Denominacion.objects.filter(id=int(denominacion_id)).first()
+        if not den:
+            raise forms.ValidationError("Seleccione una denominación válida.")
+        return den
 
     def clean_usuario(self):
         usuario_id = (self.cleaned_data.get('usuario') or '').strip()

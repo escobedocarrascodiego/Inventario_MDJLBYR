@@ -875,13 +875,14 @@ def bienes_datatable(request):
         1: 'descripcion',
         2: 'marca',
         3: 'estado',
-        4: 'valor_neto',
-        5: 'tasa_depreciacion',
-        6: 'vida_util_meses',
-        7: 'fecha_pecosa',
-        8: 'resolucion_alta',
-        9: 'usuario_asignado__apellidos',
-        10: 'oficina__nombre',
+        4: 'cuenta_contable__codigo',
+        5: 'valor_neto',
+        6: 'tasa_depreciacion',
+        7: 'vida_util_meses',
+        8: 'fecha_pecosa',
+        9: 'resolucion_alta',
+        10: 'usuario_asignado__apellidos',
+        11: 'oficina__nombre',
     }
     order_field = order_map.get(order_column, 'codigo_patrimonial')
     if order_dir == 'desc':
@@ -946,6 +947,15 @@ def bienes_datatable(request):
             marca_modelo = '-'
         marca_modelo = escape(marca_modelo)
         estado_html = estado_badge(bien.estado, bien.get_estado_display())
+
+        # Cuenta contable: se muestra el código y la descripción completa como tooltip.
+        if bien.cuenta_contable:
+            cuenta_cod = escape(bien.cuenta_contable.codigo or '')
+            cuenta_desc = escape(bien.cuenta_contable.descripcion or '')
+            cuenta_html = f'<span title="{cuenta_desc}">{cuenta_cod}</span>'
+        else:
+            cuenta_html = '-'
+
         valor_neto = f"S/ {bien.valor_neto:,.2f}" if bien.valor_neto is not None else 'S/ 0.00'
         
         tasa = f"{bien.tasa_depreciacion:,.2f}" if bien.tasa_depreciacion is not None else '-'
@@ -993,6 +1003,7 @@ def bienes_datatable(request):
             descripcion,
             marca_modelo,
             estado_html,
+            cuenta_html,
             valor_neto,
             tasa,
             vida_util,
@@ -1215,6 +1226,37 @@ def buscar_resolucion_etiquetas(request):
     )
 
     results = [{'id': valor, 'text': valor} for valor in valores]
+    return JsonResponse({'results': results})
+
+
+@require_http_methods(["GET"])
+def buscar_denominacion_etiquetas(request):
+    """Vista AJAX: lista las denominaciones (con bienes activos) que coinciden.
+
+    Alimenta el tipo de generación de etiquetas "Por Denominación" (p. ej.
+    imprimir todas las CPU, todos los escritorios, etc.). Se busca sobre la
+    columna denormalizada ``descripcion`` de Bien (sin JOIN, igual que el buscador
+    de bienes) y se devuelven las denominaciones DISTINTAS que tienen al menos un
+    bien activo, para no ofrecer nunca una opción que luego salga sin resultados.
+    """
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    ids = (
+        Bien.objects.exclude(estado='BAJA')
+        .filter(descripcion__icontains=query)
+        .exclude(denominacion_id__isnull=True)
+        .values_list('denominacion_id', flat=True)
+        .distinct()
+    )
+    denominaciones = (
+        Denominacion.objects.filter(id__in=list(ids))
+        .values('id', 'nombre')
+        .order_by('nombre')[:20]
+    )
+
+    results = [{'id': den['id'], 'text': den['nombre']} for den in denominaciones]
     return JsonResponse({'results': results})
 
 

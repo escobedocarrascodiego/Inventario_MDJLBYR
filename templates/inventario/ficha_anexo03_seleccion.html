@@ -102,9 +102,9 @@
                         <input type="text" id="usuarioLocal" name="local_nombre" class="form-control" readonly>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small mb-1">Dirección <span class="text-muted">(solo para teletrabajo)</span></label>
-                        <input type="text" name="direccion" class="form-control"
-                               placeholder="Dirección domiciliaria (opcional)">
+                        <label class="form-label small mb-1">Dirección <span class="text-muted">(del local o sede)</span></label>
+                        <input type="text" id="usuarioDireccion" class="form-control" readonly
+                               placeholder="Se toma del local o sede">
                     </div>
                 </div>
             </div>
@@ -279,6 +279,7 @@ $(document).ready(function() {
                 $('#usuarioDni').val(data.dni || '');
                 $('#usuarioArea').val(data.area || '');
                 $('#usuarioLocal').val(data.local || '');
+                $('#usuarioDireccion').val(data.direccion || '');
                 $('#datosUsuario').removeClass('d-none');
             },
             error: function() {
