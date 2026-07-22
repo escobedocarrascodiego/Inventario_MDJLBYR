@@ -41,6 +41,22 @@
                 <form method="post" novalidate id="form-bien">
                     {% csrf_token %}
                     
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong><i class="fas fa-exclamation-triangle me-2"></i>No se pudo guardar. Corrija lo siguiente:</strong>
+                        <ul class="mb-0 mt-2">
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
                     <!-- SECCIÓN 1: SELECCIÓN DEL TIPO DE BIEN -->
                     <div class="mb-4">
                         <h6 class="mb-3"><strong>[Selección del Tipo de Bien]</strong></h6>
@@ -374,8 +390,10 @@ $(document).ready(function() {
                     $('#id_correlativo_display').val(data.correlativo);
                 }
                 
-                // Auto-seleccionar cuenta contable si viene de la denominación
-                if (data.cuenta_contable_id) {
+                // Auto-seleccionar cuenta contable de la denominación SOLO si el
+                // bien no tiene una ya seleccionada (en edición se respeta la
+                // cuenta guardada, p. ej. cuentas de orden por <= 1/4 UIT).
+                if (data.cuenta_contable_id && !cuentaContableSelect.val()) {
                     cuentaContableSelect.val(data.cuenta_contable_id);
                 }
 

@@ -74,7 +74,22 @@
       "Bash(./venv/Scripts/python.exe _tmp_measure.py)",
       "Bash(./venv/Scripts/python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\dbf416bf-3604-4571-9fa4-2517d078a60c\\\\scratchpad\\\\test_denom.py\")",
       "Bash(cp \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\dbf416bf-3604-4571-9fa4-2517d078a60c\\\\scratchpad\\\\test_denom.py\" _tmp_test_denom.py)",
-      "Bash(./venv/Scripts/python.exe _tmp_test_denom.py)"
+      "Bash(./venv/Scripts/python.exe _tmp_test_denom.py)",
+      "PowerShell(python manage.py test bienes -v 1)",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe manage.py test bienes -v 1)",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe -m py_compile apps\\\\reportes\\\\views\\\\excel.py apps\\\\reportes\\\\views\\\\pdf.py apps\\\\bienes\\\\models.py)",
+      "PowerShell(if \\($?\\) { \"OK\" })",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_excel.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_query.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_defer.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_net.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_isolate.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_sort.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_grants.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\verify_final.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\profile_stitch.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\usuario\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Programaci-n-Inventario-MDJLBYR\\\\7ddfee59-ae7e-431b-a5a9-b64ba5ca6bf3\\\\scratchpad\\\\verify_all.py\")",
+      "PowerShell(& .\\\\venv\\\\Scripts\\\\python.exe manage.py check)"
     ]
   }
 }

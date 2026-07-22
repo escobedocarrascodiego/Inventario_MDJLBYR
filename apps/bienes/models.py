@@ -35,20 +35,24 @@ class ParametroSistema(models.Model):
         return cls.objects.order_by('-anio_fiscal').first()
 
     @classmethod
-    def get_config_for_year(cls, year):
+    def get_config_for_year(cls, year, disponibles=None):
+        # `disponibles` permite pasar la lista de parámetros ya cargada (una sola
+        # consulta) cuando se procesa en lote (reportes); sin ella, cada llamada
+        # consulta la BD y en un reporte de N bienes son N viajes al servidor.
+        if disponibles is None:
+            disponibles = list(cls.objects.all())
+        if not disponibles:
+            return None
         if not year:
-            return cls.objects.order_by('-anio_fiscal').first()
-        config = cls.objects.filter(anio_fiscal=year).first()
-        if config:
-            return config
+            return max(disponibles, key=lambda c: c.anio_fiscal)
+        for config in disponibles:
+            if config.anio_fiscal == year:
+                return config
         # Fallback: si no existe fila para el año exacto, se devuelve la del año
         # MÁS CERCANO disponible (menor |anio_fiscal - year|). En empate de distancia
         # gana el año menor (más antiguo). NO se usa la fila activa (es_activo) ni la
         # más reciente: para el umbral de 1/4 UIT interesa la UIT histórica más próxima
         # al año de adquisición del bien.
-        disponibles = list(cls.objects.all())
-        if not disponibles:
-            return None
         return min(disponibles, key=lambda c: (abs(c.anio_fiscal - year), c.anio_fiscal))
 
     class Meta:
@@ -198,7 +202,7 @@ class Bien(models.Model):
         delta = relativedelta(corte, inicio_mes_siguiente)
         return (delta.years * 12) + delta.months
 
-    def calcular_depreciacion(self, fecha_corte=None):
+    def calcular_depreciacion(self, fecha_corte=None, parametros=None):
         """FUENTE ÚNICA del cálculo de depreciación (Directiva N° 005-2016-EF/51.01).
 
         Devuelve un dict con todos los componentes para que el modelo, el reporte PDF
@@ -233,7 +237,9 @@ class Bien(models.Model):
             return resultado
 
         # --- Umbral de 1/4 UIT con la UIT del AÑO DE ADQUISICIÓN (CAMBIO 1) ---
-        config = ParametroSistema.get_config_for_year(anio_base)
+        # `parametros`: lista de ParametroSistema precargada por el llamador para
+        # evitar una consulta a la BD por cada bien en procesos por lote (reportes).
+        config = ParametroSistema.get_config_for_year(anio_base, disponibles=parametros)
         valor_uit = config.valor_uit if config else Decimal('5500.00')
         divisor_umbral = (config.divisor_umbral_depreciacion if config else 4) or 4
         umbral = valor_uit / Decimal(str(divisor_umbral))
@@ -283,7 +289,11 @@ class Bien(models.Model):
             self.clase = self.denominacion.clase.nombre
             self.codigo_patrimonial_base = self.denominacion.codigo_patrimonial_base
             # tipo_cuenta NO se auto-completa desde denominación, se selecciona manualmente en el formulario
-            self.cuenta_contable = self.denominacion.cuenta_contable
+            # La cuenta contable solo se toma de la denominación cuando el bien
+            # aún no tiene una asignada; si el usuario la cambió manualmente
+            # (p. ej. a cuentas de orden por ser <= 1/4 UIT) se respeta su elección.
+            if not self.cuenta_contable_id:
+                self.cuenta_contable = self.denominacion.cuenta_contable
             
             # Generar código patrimonial completo si no existe
             if not self.codigo_patrimonial or self.correlativo == 0:

@@ -1,6 +1,6 @@
 from django.http import HttpResponse
 from django.conf import settings
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -10,16 +10,17 @@ from organizacion.models import Local
 from catalogos.models import CuentaContable
 from bienes.models import Bien, ParametroSistema
 from bajas.models import BajaBien
+from .carga import cargar_bienes_con_relaciones
 
 
 def generar_reporte_excel_bienes_detallados(request):
     """Genera un reporte Excel detallado de todos los bienes activos con todos los datos disponibles"""
-    # Obtener todos los bienes activos con todas las relaciones
-    bienes = Bien.objects.exclude(estado='BAJA').select_related(
-        'denominacion', 'denominacion__grupo_generico', 'denominacion__clase',
-        'cuenta_contable', 'usuario_asignado', 'usuario_asignado__area', 'usuario_asignado__area__local',
-        'usuario_asignado__oficina', 'local', 'local__entidad', 'area', 'oficina'
-    ).order_by('codigo_patrimonial')
+    # Obtener todos los bienes activos con todas las relaciones.
+    # Sin JOINs ni ORDER BY en SQL (ver apps/reportes/views/carga.py): en este
+    # servidor esas consultas esperan hasta 25s por memoria (RESOURCE_SEMAPHORE).
+    # Las relaciones se cosen en Python y el orden se aplica aquí.
+    bienes = cargar_bienes_con_relaciones(Bien.objects.exclude(estado='BAJA'))
+    bienes.sort(key=lambda b: b.codigo_patrimonial or '')
     
     # Crear libro de trabajo Excel
     wb = Workbook()
@@ -37,7 +38,8 @@ def generar_reporte_excel_bienes_detallados(request):
     )
     center_alignment = Alignment(horizontal='center', vertical='center')
     left_alignment = Alignment(horizontal='left', vertical='center')
-    
+    right_alignment = Alignment(horizontal='right', vertical='center')
+
     # Encabezados
     headers = [
         'Código Patrimonial',
@@ -92,10 +94,14 @@ def generar_reporte_excel_bienes_detallados(request):
     # Corte = hoy para el snapshot de depreciación (fuente única: modelo). (CAMBIO 6)
     fecha_corte = datetime.now().date()
 
+    # Parámetros UIT cargados UNA sola vez: sin esto, calcular_depreciacion()
+    # consulta la BD por cada bien (N viajes al servidor SQL, muy lento en IIS).
+    parametros_uit = list(ParametroSistema.objects.all())
+
     # Escribir datos
     for row_num, bien in enumerate(bienes, 2):
         # Cálculo de depreciación con la MISMA lógica del modelo (sin reimplementar fórmula)
-        dep = bien.calcular_depreciacion(fecha_corte)
+        dep = bien.calcular_depreciacion(fecha_corte, parametros=parametros_uit)
         fecha_inicio_dep = dep['fecha_inicio'].strftime('%d/%m/%Y') if dep['fecha_inicio'] else 'N/A'
         if dep['depreciable']:
             depreciable_txt = 'Sí'
@@ -177,10 +183,10 @@ def generar_reporte_excel_bienes_detallados(request):
             # Formato especial para columnas numéricas
             if col_num in [11, 12, 34, 35, 36]:  # Valores monetarios
                 cell.number_format = '#,##0.00'
-                cell.alignment = Alignment(horizontal='right', vertical='center')
+                cell.alignment = right_alignment
             elif col_num == 31:  # Tasa (%)
                 cell.number_format = '0.00'
-                cell.alignment = Alignment(horizontal='right', vertical='center')
+                cell.alignment = right_alignment
             elif col_num == 33:  # Meses (entero)
                 cell.alignment = center_alignment
     
@@ -246,15 +252,18 @@ def generar_reporte_excel_bienes_detallados(request):
 
 def generar_reporte_excel_bienes_por_local(request):
     """Genera un reporte Excel de bienes agrupados por local"""
-    from django.db.models import Count, Sum, Q
-    
-    # Obtener todos los locales con sus bienes activos
-    locales = Local.objects.prefetch_related(
-        'bien_set'
-    ).annotate(
-        total_bienes=Count('bien', filter=~Q(bien__estado='BAJA')),
-        valor_total=Sum('bien__valor_neto', filter=~Q(bien__estado='BAJA'))
-    ).filter(total_bienes__gt=0).order_by('nombre')
+    # Una sola carga de todos los bienes activos sin JOINs (ver carga.py) y
+    # agrupación/orden/totales en Python: evita la consulta con agregados y las
+    # ~30 consultas con JOINs (una por local) que esperaban memoria en el servidor.
+    bienes_activos = cargar_bienes_con_relaciones(Bien.objects.exclude(estado='BAJA'))
+    bienes_por_local = {}
+    for b in bienes_activos:
+        bienes_por_local.setdefault(b.local_id, []).append(b)
+
+    locales = sorted(
+        (l for l in Local.objects.order_by() if l.pk in bienes_por_local),
+        key=lambda l: l.nombre or ''
+    )
     
     # Crear libro de trabajo Excel
     wb = Workbook()
@@ -279,10 +288,10 @@ def generar_reporte_excel_bienes_por_local(request):
     
     # Iterar por cada local
     for local in locales:
-        bienes = Bien.objects.filter(local=local).exclude(estado='BAJA').select_related(
-            'denominacion', 'cuenta_contable', 'usuario_asignado', 'area', 'oficina'
-        ).order_by('codigo_patrimonial')
-        
+        bienes = sorted(bienes_por_local[local.pk], key=lambda b: b.codigo_patrimonial or '')
+        total_bienes = len(bienes)
+        valor_total = sum((b.valor_neto or 0) for b in bienes)
+
         # Encabezado del local
         ws.merge_cells(f'A{row_num}:F{row_num}')
         cell = ws.cell(row=row_num, column=1)
@@ -292,10 +301,10 @@ def generar_reporte_excel_bienes_por_local(request):
         cell.alignment = center_alignment
         cell.border = border_style
         row_num += 1
-        
+
         ws.merge_cells(f'A{row_num}:F{row_num}')
         cell = ws.cell(row=row_num, column=1)
-        cell.value = f"Dirección: {local.direccion} | Total Bienes: {local.total_bienes} | Valor Total: S/ {local.valor_total or 0:,.2f}"
+        cell.value = f"Dirección: {local.direccion} | Total Bienes: {total_bienes} | Valor Total: S/ {valor_total or 0:,.2f}"
         cell.border = border_style
         row_num += 1
         
@@ -365,11 +374,14 @@ def generar_reporte_excel_bienes_por_local(request):
 
 def generar_reporte_excel_bienes_baja(request):
     """Genera un reporte Excel de todos los bienes dados de baja"""
-    # Obtener todos los bienes dados de baja
-    bienes = Bien.objects.filter(estado='BAJA').select_related(
-        'denominacion', 'denominacion__grupo_generico', 'denominacion__clase',
-        'cuenta_contable', 'usuario_asignado', 'local', 'area', 'oficina'
-    ).order_by('-fecha_adquisicion')
+    # Obtener todos los bienes dados de baja.
+    # Sin JOINs ni ORDER BY en SQL (ver carga.py: evita esperas RESOURCE_SEMAPHORE).
+    # Se ordena en Python replicando el mismo orden: fecha descendente, sin fecha al final.
+    bienes = cargar_bienes_con_relaciones(Bien.objects.filter(estado='BAJA'))
+    bienes.sort(
+        key=lambda b: (b.fecha_adquisicion is not None, b.fecha_adquisicion or date.min),
+        reverse=True
+    )
     
     # Crear libro de trabajo Excel
     wb = Workbook()

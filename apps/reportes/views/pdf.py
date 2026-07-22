@@ -24,6 +24,7 @@ from organizacion.models import Local, Area, Oficina
 from catalogos.models import CuentaContable, Denominacion
 from bienes.models import Bien, ParametroSistema
 from bajas.models import BajaBien
+from .carga import cargar_bienes_con_relaciones
 
 
 def reportes_index(request):
@@ -57,9 +58,7 @@ def generar_reporte_depreciacion(request):
     denominacion_id = (request.GET.get('denominacion_id') or '').strip()
     cuenta_contable_id = (request.GET.get('cuenta_contable_id') or '').strip()
 
-    bienes = Bien.objects.exclude(estado='BAJA').select_related(
-        'denominacion', 'cuenta_contable', 'local', 'area', 'oficina'
-    )
+    bienes = Bien.objects.exclude(estado='BAJA')
 
     if local_id:
         bienes = bienes.filter(local_id=local_id)
@@ -72,11 +71,18 @@ def generar_reporte_depreciacion(request):
     if cuenta_contable_id:
         bienes = bienes.filter(cuenta_contable_id=cuenta_contable_id)
 
-    bienes = bienes.order_by('codigo_patrimonial')
+    # Sin JOINs ni ORDER BY en SQL (ver carga.py): en este servidor esas consultas
+    # esperan hasta 25s por memoria de ejecución (RESOURCE_SEMAPHORE). Las
+    # relaciones se cosen en Python y el orden se aplica aquí.
+    bienes = cargar_bienes_con_relaciones(bienes)
+    bienes.sort(key=lambda b: b.codigo_patrimonial or '')
 
     # Fuente ÚNICA de verdad: el cálculo vive en el modelo (Bien.calcular_depreciacion).
     # Corte = hoy para el snapshot del reporte. (CAMBIO 2)
     fecha_corte = date.today()
+
+    # Parámetros UIT cargados UNA sola vez para evitar una consulta por cada bien.
+    parametros_uit = list(ParametroSistema.objects.all())
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="reporte_depreciacion_{}.pdf"'.format(
@@ -126,7 +132,7 @@ def generar_reporte_depreciacion(request):
     ]]
 
     for bien in bienes:
-        dep = bien.calcular_depreciacion(fecha_corte)  # fuente única (CAMBIO 2)
+        dep = bien.calcular_depreciacion(fecha_corte, parametros=parametros_uit)  # fuente única (CAMBIO 2)
         if not dep['depreciable']:
             dep_anual = Decimal('0.00')
             dep_mensual = Decimal('0.00')
