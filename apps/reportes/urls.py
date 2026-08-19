@@ -15,6 +15,11 @@ urlpatterns = [
     path('funciones/reportes/bienes-baja/', views.generar_reporte_bienes_baja, name='reporte_bienes_baja'),
     path('funciones/reportes/por-cuentas-contables/', views.generar_reporte_por_cuentas_contables, name='reporte_por_cuentas_contables'),
 
+    # Reportes agrupados por criterio (orden de compra, cuenta contable,
+    # denominación, marca, local...). Una sola vista para PDF y Excel:
+    # ?agrupar_por=marca&formato=excel&detalle=1 + filtros de búsqueda avanzada.
+    path('funciones/reportes/agrupado/', views.reporte_agrupado, name='reporte_agrupado'),
+
     # URLs para Reportes en Excel
     path('funciones/reportes/excel/bienes-detallados/', views.generar_reporte_excel_bienes_detallados, name='reporte_excel_bienes_detallados'),
     path('funciones/reportes/excel/bienes-por-local/', views.generar_reporte_excel_bienes_por_local, name='reporte_excel_bienes_por_local'),

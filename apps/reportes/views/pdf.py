@@ -25,11 +25,30 @@ from catalogos.models import CuentaContable, Denominacion
 from bienes.models import Bien, ParametroSistema
 from bajas.models import BajaBien
 from .carga import cargar_bienes_con_relaciones
+from .comunes import (
+    CanvasNumerado, bienes_para_reporte, cabecera_reporte, nombre_archivo,
+)
 
 
 def reportes_index(request):
-    """Vista para seleccionar el tipo de reporte a generar"""
-    return render(request, 'inventario/reportes_index.html')
+    """Vista para seleccionar el tipo de reporte a generar.
+
+    Además de las tarjetas fijas, entrega los criterios de agrupación y los
+    catálogos que alimentan el modal de filtros del reporte agrupado
+    (ver apps/reportes/views/agrupado.py).
+    """
+    from .agrupado import CRITERIOS
+
+    context = {
+        'criterios_agrupacion': [
+            (clave, config['label']) for clave, config in CRITERIOS.items()
+        ],
+        'locales': Local.objects.order_by('nombre'),
+        'cuentas_contables': CuentaContable.objects.order_by('codigo'),
+        'estado_choices': Bien.ESTADO_BIEN,
+        'situacion_choices': Bien.SITUACION_CHOICES,
+    }
+    return render(request, 'inventario/reportes_index.html', context)
 
 
 
@@ -184,27 +203,24 @@ def generar_reporte_depreciacion(request):
 
 
 def generar_reporte_bienes_activos(request):
-    """Genera un reporte PDF detallado de todos los bienes activos con formato estructurado"""
-    from reportlab.platypus import KeepTogether
-    
-    # Obtener todos los bienes activos (excluyendo los dados de baja).
-    # Se hace select_related SOLO de las relaciones que realmente se usan en el
-    # PDF y se materializa en lista para no repetir la consulta en .count()/.exists()
-    # (cada repetición era un viaje extra al servidor SQL remoto).
-    bienes = list(Bien.objects.exclude(estado='BAJA').select_related(
-        'denominacion', 'cuenta_contable', 'usuario_asignado',
-        'local', 'area', 'oficina'
-    ).order_by('codigo_patrimonial'))
-    
+    """Reporte PDF detallado de bienes activos: una ficha con recuadro por bien.
+
+    Acepta por querystring los MISMOS filtros de la búsqueda avanzada del
+    listado de bienes (ver apps/bienes/filtros.py), de modo que sirve tanto
+    para el inventario completo como para imprimir exactamente el resultado de
+    una búsqueda. Sin filtros imprime todos los bienes activos.
+    """
+    bienes, filtros_texto, hay_filtros = bienes_para_reporte(request)
+
     # Crear respuesta HTTP con tipo PDF
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="reporte_bienes_activos_{}.pdf"'.format(
-        datetime.now().strftime('%Y%m%d_%H%M%S')
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(
+        nombre_archivo('reporte_bienes_activos', 'pdf', hay_filtros)
     )
-    
+
     # Crear documento PDF con márgenes
     doc = SimpleDocTemplate(
-        response, 
+        response,
         pagesize=A4,
         leftMargin=1*cm,
         rightMargin=1*cm,
@@ -212,33 +228,9 @@ def generar_reporte_bienes_activos(request):
         bottomMargin=1.5*cm
     )
     elements = []
-    
-    # Ruta del logo
-    logo_path = os.path.join(settings.BASE_DIR, 'images', 'logo_transparente.png')
-    
-    # Estilos
+
     styles = getSampleStyleSheet()
-    
-    # Estilo para el título principal (azul, negrita, centrado)
-    title_style = ParagraphStyle(
-        'ReportTitle',
-        parent=styles['Heading1'],
-        fontSize=14,
-        textColor=colors.HexColor('#0066CC'),
-        spaceAfter=10,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    # Estilo para etiquetas de datos
-    label_style = ParagraphStyle(
-        'LabelStyle',
-        parent=styles['Normal'],
-        fontSize=8,
-        fontName='Helvetica-Bold',
-        alignment=TA_LEFT
-    )
-    
+
     # Estilo para valores de datos
     value_style = ParagraphStyle(
         'ValueStyle',
@@ -247,112 +239,14 @@ def generar_reporte_bienes_activos(request):
         fontName='Helvetica',
         alignment=TA_LEFT
     )
-    
-    # Estilo para encabezado de página
-    header_style = ParagraphStyle(
-        'HeaderStyle',
-        parent=styles['Normal'],
-        fontSize=7,
-        fontName='Helvetica',
-        alignment=TA_RIGHT
-    )
-    
-    # Estilo para entidad/dependencia
-    entity_style = ParagraphStyle(
-        'EntityStyle',
-        parent=styles['Normal'],
-        fontSize=9,
-        fontName='Helvetica',
-        alignment=TA_CENTER,
-        spaceAfter=5
-    )
-    
-    # ===== ENCABEZADO DE PÁGINA =====
-    # Crear tabla para encabezado: Logo (izq) | Título (centro) | Página/Fecha (der)
-    header_table_data = []
-    
-    # Columna izquierda: Logo
-    logo_cell = []
-    if os.path.exists(logo_path):
-        try:
-            pil_logo = PILImage.open(logo_path)
-            if pil_logo.mode in ('RGBA', 'LA', 'P'):
-                background = PILImage.new('RGB', pil_logo.size, (255, 255, 255))
-                if pil_logo.mode == 'P':
-                    pil_logo = pil_logo.convert('RGBA')
-                if pil_logo.mode == 'RGBA':
-                    background.paste(pil_logo, mask=pil_logo.split()[-1])
-                else:
-                    background.paste(pil_logo)
-                pil_logo = background
-            elif pil_logo.mode != 'RGB':
-                pil_logo = pil_logo.convert('RGB')
-            
-            # Tamaño del logo: 1.5cm
-            target_size_pixels = 177  # 1.5cm a 300 DPI
-            pil_logo.thumbnail((target_size_pixels, target_size_pixels), PILImage.Resampling.LANCZOS)
-            final_logo = PILImage.new('RGB', (target_size_pixels, target_size_pixels), (255, 255, 255))
-            if pil_logo.size[0] <= target_size_pixels and pil_logo.size[1] <= target_size_pixels:
-                x_offset = (target_size_pixels - pil_logo.size[0]) // 2
-                y_offset = (target_size_pixels - pil_logo.size[1]) // 2
-                final_logo.paste(pil_logo, (x_offset, y_offset))
-            else:
-                final_logo = pil_logo.resize((target_size_pixels, target_size_pixels), PILImage.Resampling.LANCZOS)
-            
-            logo_buffer = BytesIO()
-            final_logo.save(logo_buffer, format='PNG', dpi=(300, 300))
-            logo_buffer.seek(0)
-            logo_size = 1.5*cm
-            logo_img = Image(logo_buffer, width=logo_size, height=logo_size)
-            logo_cell.append(logo_img)
-            logo_cell.append(Paragraph("Software Inventario Mobiliario Institucional", 
-                                     ParagraphStyle('LogoText', parent=styles['Normal'], fontSize=6, 
-                                                   fontName='Helvetica', alignment=TA_CENTER)))
-        except Exception:
-            logo_cell.append(Paragraph("SBN", label_style))
-            logo_cell.append(Paragraph("Software Inventario Mobiliario Institucional", 
-                                     ParagraphStyle('LogoText', parent=styles['Normal'], fontSize=6, 
-                                                   fontName='Helvetica', alignment=TA_CENTER)))
-    else:
-        logo_cell.append(Paragraph("SBN", label_style))
-        logo_cell.append(Paragraph("Software Inventario Mobiliario Institucional", 
-                                 ParagraphStyle('LogoText', parent=styles['Normal'], fontSize=6, 
-                                               fontName='Helvetica', alignment=TA_CENTER)))
-    
-    # Columna central: Título
-    title_cell = [Paragraph("REPORTE DETALLADO DE BIENES ACTIVOS", title_style)]
-    
-    # Columna derecha: Página y Fecha
-    page_cell = [
-        Paragraph(f"Pag. : 1 de 1", header_style),
-        Paragraph(f"Fecha : {datetime.now().strftime('%d/%m/%Y')}", header_style)
-    ]
-    
-    header_table = Table(
-        [[logo_cell, title_cell, page_cell]],
-        colWidths=[3*cm, 12*cm, 3*cm]
-    )
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 0.2*cm))
-    
-    # Entidad y Dependencia
-    entidad_nombre = "MUNICIPALIDAD DISTRITAL DE JOSÉ LUIS BUSTAMANTE Y RIVERO"
-    dependencia_nombre = "MUNICIPALIDAD DISTRITAL DE JOSE LUIS BUS"  # Truncado como en la imagen
-    
-    elements.append(Paragraph(f"ENTIDAD : {entidad_nombre}", entity_style))
-    elements.append(Paragraph(f"DEPENDENCIA : {dependencia_nombre}", entity_style))
-    elements.append(Spacer(1, 0.3*cm))
-    
+
+    # Cabecera común (logo, título, entidad y filtros aplicados)
+    elements.extend(cabecera_reporte(
+        "REPORTE DETALLADO DE BIENES ACTIVOS",
+        filtros_texto,
+        dependencia="MUNICIPALIDAD DISTRITAL DE JOSE LUIS BUS"
+    ))
+
     # ===== CUERPO: BIENES DETALLADOS =====
     total_bienes = len(bienes)
 
@@ -479,9 +373,9 @@ def generar_reporte_bienes_activos(request):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
     ]))
     elements.append(footer_table)
-    
-    # Construir PDF
-    doc.build(elements)
+
+    # Construir PDF (CanvasNumerado escribe "Pág. X de Y" real al pie)
+    doc.build(elements, canvasmaker=CanvasNumerado)
     return response
 
 

@@ -22,8 +22,13 @@
                     <i class="fas fa-file-alt fa-3x text-primary"></i>
                 </div>
                 <h5 class="card-title mb-3">Bienes Activos Detallado</h5>
-                <p class="card-text text-muted mb-4">
+                <p class="card-text text-muted mb-3">
                     Reporte completo y detallado de todos los bienes activos del inventario patrimonial con todos los datos disponibles.
+                </p>
+                <p class="small text-muted mb-3">
+                    <i class="fas fa-lightbulb me-1"></i>Para generarlo <strong>solo de un grupo de bienes</strong>,
+                    use <a href="{% url 'inventario:bien_list' %}">Bienes &rsaquo; B&uacute;squeda avanzada</a> y ah&iacute; el bot&oacute;n
+                    &laquo;Generar reporte&raquo;.
                 </p>
                 <div class="d-grid gap-2">
                     <a href="{% url 'inventario:reporte_bienes_activos' %}" class="btn btn-primary btn-sm" target="_blank">
@@ -32,6 +37,84 @@
                     <a href="{% url 'inventario:reporte_excel_bienes_detallados' %}" class="btn btn-success btn-sm" target="_blank">
                         <i class="fas fa-file-excel me-2"></i>Generar Excel
                     </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reportes agrupados por criterio -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-file-invoice-dollar fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes por Orden de Compra</h5>
+                <p class="card-text text-muted mb-4">
+                    Bienes agrupados por orden de compra / resoluci&oacute;n de alta, con cantidad y montos totalizados por cada una.
+                </p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary btn-sm btn-reporte-agrupado" data-criterio="orden_compra">
+                        <i class="fas fa-sliders-h me-2"></i>Configurar y generar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-tags fa-3x text-info"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes por Denominaci&oacute;n</h5>
+                <p class="card-text text-muted mb-4">
+                    Cu&aacute;ntos bienes hay de cada denominaci&oacute;n (CPU, escritorio, silla...) y cu&aacute;nto suman.
+                </p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-info btn-sm text-white btn-reporte-agrupado" data-criterio="denominacion">
+                        <i class="fas fa-sliders-h me-2"></i>Configurar y generar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-copyright fa-3x text-dark"></i>
+                </div>
+                <h5 class="card-title mb-3">Bienes por Marca</h5>
+                <p class="card-text text-muted mb-4">
+                    Bienes agrupados por marca, para ver la composici&oacute;n del parque de equipos y su valorizaci&oacute;n.
+                </p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-dark btn-sm btn-reporte-agrupado" data-criterio="marca">
+                        <i class="fas fa-sliders-h me-2"></i>Configurar y generar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0" style="transition: transform 0.2s;">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-layer-group fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title mb-3">Reporte por cualquier criterio</h5>
+                <p class="card-text text-muted mb-4">
+                    Agrupe por cuenta contable, grupo gen&eacute;rico, clase, local, &aacute;rea, oficina, usuario,
+                    condici&oacute;n, forma de adquisici&oacute;n o a&ntilde;o. En PDF o Excel, resumen o detallado.
+                </p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-success btn-sm btn-reporte-agrupado" data-criterio="cuenta_contable">
+                        <i class="fas fa-sliders-h me-2"></i>Configurar y generar
+                    </button>
                 </div>
             </div>
         </div>
@@ -155,6 +238,108 @@
     </div>
 </div>
 
+<!-- Modal: Reporte agrupado por criterio -->
+<div class="modal fade" id="modalReporteAgrupado" tabindex="-1" aria-labelledby="modalReporteAgrupadoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalReporteAgrupadoLabel">
+                    <i class="fas fa-layer-group me-2"></i>Reporte de bienes agrupado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label for="agr_criterio" class="form-label"><strong>Agrupar por</strong></label>
+                        <select id="agr_criterio" class="form-select">
+                            {% for clave, etiqueta in criterios_agrupacion %}
+                            <option value="{{ clave }}">{{ etiqueta }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label for="agr_detalle" class="form-label"><strong>Nivel de detalle</strong></label>
+                        <select id="agr_detalle" class="form-select">
+                            <option value="0">Resumen (totales por grupo)</option>
+                            <option value="1">Detallado (lista de bienes)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+                <p class="mb-2"><strong>Filtros opcionales</strong>
+                    <span class="text-muted small">&mdash; deje en blanco para incluir todos los bienes activos</span>
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="agr_local" class="form-label">Local</label>
+                        <select id="agr_local" class="form-select" data-param="local_id">
+                            <option value="">Todos</option>
+                            {% for local in locales %}
+                            <option value="{{ local.id }}">{{ local.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="agr_cuenta" class="form-label">Cuenta contable</label>
+                        <select id="agr_cuenta" class="form-select" data-param="cuenta_id">
+                            <option value="">Todas</option>
+                            {% for cuenta in cuentas_contables %}
+                            <option value="{{ cuenta.id }}">{{ cuenta.codigo }} - {{ cuenta.descripcion }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="agr_estado" class="form-label">Condici&oacute;n</label>
+                        <select id="agr_estado" class="form-select" data-param="estado">
+                            <option value="">Todas</option>
+                            {% for key, label in estado_choices %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="agr_situacion" class="form-label">Situaci&oacute;n</label>
+                        <select id="agr_situacion" class="form-select" data-param="situacion">
+                            <option value="">Todas</option>
+                            {% for key, label in situacion_choices %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="agr_marca" class="form-label">Marca</label>
+                        <input type="text" id="agr_marca" class="form-control" data-param="marca" placeholder="Ej: HP">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="agr_resolucion" class="form-label">Orden de compra / Resoluci&oacute;n</label>
+                        <input type="text" id="agr_resolucion" class="form-control" data-param="resolucion_alta" placeholder="Ej: O/C 0123">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="agr_fecha_inicio" class="form-label">Adquisici&oacute;n desde</label>
+                        <input type="date" id="agr_fecha_inicio" class="form-control" data-param="fecha_inicio">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="agr_fecha_fin" class="form-label">Adquisici&oacute;n hasta</label>
+                        <input type="date" id="agr_fecha_fin" class="form-control" data-param="fecha_fin">
+                    </div>
+                </div>
+                <div class="alert alert-warning d-none mt-3" id="agr_error" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary me-auto" id="agr_limpiar">Limpiar filtros</button>
+                <button type="button" class="btn btn-danger" id="agr_pdf">
+                    <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                </button>
+                <button type="button" class="btn btn-success" id="agr_excel">
+                    <i class="fas fa-file-excel me-2"></i>Generar Excel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal para Reporte por Cuentas Contables -->
 <div class="modal fade" id="modalReporteCuentasContables" tabindex="-1" aria-labelledby="modalReporteCuentasContablesLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -243,6 +428,59 @@ $(document).ready(function() {
         window.open(url, '_blank');
     });
     
+    // ---- Reporte agrupado por criterio ----
+    const modalAgrupado = new bootstrap.Modal(document.getElementById('modalReporteAgrupado'));
+
+    // Cada tarjeta abre el mismo modal con su criterio preseleccionado.
+    $('.btn-reporte-agrupado').on('click', function() {
+        $('#agr_criterio').val($(this).data('criterio'));
+        $('#agr_error').addClass('d-none');
+        modalAgrupado.show();
+    });
+
+    function urlReporteAgrupado(formato) {
+        const params = new URLSearchParams();
+        params.set('agrupar_por', $('#agr_criterio').val());
+        params.set('detalle', $('#agr_detalle').val());
+        params.set('formato', formato);
+        // Los filtros viajan con el mismo nombre que usa la busqueda avanzada
+        // de bienes (data-param): el backend los interpreta con el mismo
+        // modulo, bienes/filtros.py
+        $('#modalReporteAgrupado [data-param]').each(function() {
+            const valor = ($(this).val() || '').trim();
+            if (valor) {
+                params.set($(this).data('param'), valor);
+            }
+        });
+        return '{% url "inventario:reporte_agrupado" %}?' + params.toString();
+    }
+
+    function validarFechasAgrupado() {
+        const desde = $('#agr_fecha_inicio').val();
+        const hasta = $('#agr_fecha_fin').val();
+        if (desde && hasta && desde > hasta) {
+            $('#agr_error').removeClass('d-none')
+                .html('<i class="fas fa-exclamation-triangle me-2"></i>La fecha "desde" debe ser anterior o igual a la fecha "hasta".');
+            return false;
+        }
+        $('#agr_error').addClass('d-none');
+        return true;
+    }
+
+    $('#agr_pdf, #agr_excel').on('click', function() {
+        if (!validarFechasAgrupado()) {
+            return;
+        }
+        const formato = this.id === 'agr_excel' ? 'excel' : 'pdf';
+        window.open(urlReporteAgrupado(formato), '_blank');
+        modalAgrupado.hide();
+    });
+
+    $('#agr_limpiar').on('click', function() {
+        $('#modalReporteAgrupado [data-param]').val('');
+        $('#agr_error').addClass('d-none');
+    });
+
     // Limpiar mensaje de error al cambiar fechas
     $('#fechaDesdeCuentas, #fechaHastaCuentas').on('change', function() {
         $('#mensajeErrorCuentas').addClass('d-none');

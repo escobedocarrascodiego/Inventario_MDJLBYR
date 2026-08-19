@@ -8,6 +8,9 @@ from .pdf import (
     generar_reporte_bienes_baja,
     generar_reporte_por_cuentas_contables,
 )
+from .agrupado import (
+    reporte_agrupado,
+)
 from .excel import (
     generar_reporte_excel_bienes_detallados,
     generar_reporte_excel_bienes_por_local,

@@ -11,17 +11,21 @@ from catalogos.models import CuentaContable
 from bienes.models import Bien, ParametroSistema
 from bajas.models import BajaBien
 from .carga import cargar_bienes_con_relaciones
+from .comunes import bienes_para_reporte, nombre_archivo
 
 
 def generar_reporte_excel_bienes_detallados(request):
-    """Genera un reporte Excel detallado de todos los bienes activos con todos los datos disponibles"""
-    # Obtener todos los bienes activos con todas las relaciones.
-    # Sin JOINs ni ORDER BY en SQL (ver apps/reportes/views/carga.py): en este
-    # servidor esas consultas esperan hasta 25s por memoria (RESOURCE_SEMAPHORE).
-    # Las relaciones se cosen en Python y el orden se aplica aquí.
-    bienes = cargar_bienes_con_relaciones(Bien.objects.exclude(estado='BAJA'))
-    bienes.sort(key=lambda b: b.codigo_patrimonial or '')
-    
+    """Reporte Excel detallado de bienes activos con todos los datos disponibles.
+
+    Acepta por querystring los MISMOS filtros de la búsqueda avanzada del
+    listado de bienes (ver apps/bienes/filtros.py): es la versión en Excel del
+    botón "Generar reporte" de esa búsqueda. Sin filtros exporta todo.
+    """
+    # bienes_para_reporte carga sin JOINs ni ORDER BY en SQL (ver carga.py): en
+    # este servidor esas consultas esperan hasta 25s por memoria
+    # (RESOURCE_SEMAPHORE). Las relaciones se cosen en Python.
+    bienes, filtros_texto, hay_filtros = bienes_para_reporte(request)
+
     # Crear libro de trabajo Excel
     wb = Workbook()
     ws = wb.active
@@ -82,9 +86,20 @@ def generar_reporte_excel_bienes_detallados(request):
         '¿Depreciable?'
     ]
 
-    # Escribir encabezados
+    # Fila 1: constancia de los filtros con los que se generó el archivo, para
+    # que quien lo reciba sepa si es el inventario completo o un subconjunto.
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    celda_filtros = ws.cell(row=1, column=1)
+    celda_filtros.value = 'Filtros aplicados: ' + (
+        ' | '.join(filtros_texto) if filtros_texto else 'ninguno (todos los bienes activos)'
+    )
+    celda_filtros.font = Font(bold=True, size=10)
+    celda_filtros.alignment = left_alignment
+    celda_filtros.fill = PatternFill(start_color="F2F6FC", end_color="F2F6FC", fill_type="solid")
+
+    # Escribir encabezados (fila 2)
     for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num)
+        cell = ws.cell(row=2, column=col_num)
         cell.value = header
         cell.fill = header_fill
         cell.font = header_font
@@ -98,8 +113,8 @@ def generar_reporte_excel_bienes_detallados(request):
     # consulta la BD por cada bien (N viajes al servidor SQL, muy lento en IIS).
     parametros_uit = list(ParametroSistema.objects.all())
 
-    # Escribir datos
-    for row_num, bien in enumerate(bienes, 2):
+    # Escribir datos (arrancan en la fila 3: 1 = filtros, 2 = encabezados)
+    for row_num, bien in enumerate(bienes, 3):
         # Cálculo de depreciación con la MISMA lógica del modelo (sin reimplementar fórmula)
         dep = bien.calcular_depreciacion(fecha_corte, parametros=parametros_uit)
         fecha_inicio_dep = dep['fecha_inicio'].strftime('%d/%m/%Y') if dep['fecha_inicio'] else 'N/A'
@@ -234,14 +249,16 @@ def generar_reporte_excel_bienes_detallados(request):
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
     
-    # Congelar primera fila (encabezados)
-    ws.freeze_panes = 'A2'
-    
+    # Congelar la fila de filtros y la de encabezados
+    ws.freeze_panes = 'A3'
+
     # Crear respuesta HTTP
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename="reporte_bienes_detallados_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(
+        nombre_archivo('reporte_bienes_detallados', 'xlsx', hay_filtros)
+    )
     
     # Guardar libro de trabajo en la respuesta
     wb.save(response)

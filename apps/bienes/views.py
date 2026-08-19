@@ -20,6 +20,7 @@ from organizacion.models import Local, Area, Oficina
 from personal.models import Personal
 from catalogos.models import CuentaContable, Denominacion
 from .models import Bien, ParametroSistema, HistoricoDepreciacion, validar_cierre_anterior
+from .filtros import parametros_filtro, filtrar_bienes
 from .forms import BienForm
 from inventario.permisos import PermisoRequeridoMixin, solo_superusuario
 
@@ -601,6 +602,10 @@ class BienListView(ListView):
         context['cuentas_contables'] = CuentaContable.objects.order_by('codigo')
         context['estado_choices'] = Bien.ESTADO_BIEN
         context['situacion_choices'] = Bien.SITUACION_CHOICES
+        # Catálogos de ubicación para la búsqueda avanzada (y, por lo tanto,
+        # para el reporte que se genera desde ella).
+        context['locales'] = Local.objects.order_by('nombre')
+        context['oficinas'] = Oficina.objects.order_by('nombre')
         return context
 
 
@@ -787,82 +792,17 @@ def bienes_datatable(request):
     start = _to_int(request.GET.get('start'), 0)
     length = _to_int(request.GET.get('length'), 25)
     
-    search_value = (request.GET.get('search[value]', '') or '').strip()
-    codigo = (request.GET.get('codigo', '') or '').strip()
-    denominacion = (request.GET.get('denominacion', '') or '').strip()
-    ubicacion = (request.GET.get('ubicacion_fisica', '') or '').strip()
-    personal_id = (request.GET.get('personal_id', '') or '').strip()
-    cuenta_id = (request.GET.get('cuenta_id', '') or '').strip()
-    estado = (request.GET.get('estado', '') or '').strip()
-    resolucion_alta = (request.GET.get('resolucion_alta', '') or '').strip()
-    fecha_inicio = (request.GET.get('fecha_inicio', '') or '').strip()
-    fecha_fin = (request.GET.get('fecha_fin', '') or '').strip()
-    situacion = (request.GET.get('situacion', '') or '').strip()
+    # Los criterios de filtrado viven en bienes/filtros.py (fuente única):
+    # el mismo módulo lo usan los reportes PDF/Excel, de modo que "generar
+    # reporte" siempre devuelve exactamente lo que muestra esta tabla.
+    params = parametros_filtro(request)
 
     # 1. BASE LIMPIA (Sin select_related todavía)
     base_qs = Bien.objects.exclude(estado='BAJA')
     records_total = base_qs.count()
 
     # 2. APLICAR FILTROS
-    queryset = base_qs
-    has_filters = False
-
-    if search_value:
-        has_filters = True
-        queryset = queryset.filter(
-            Q(descripcion__icontains=search_value) |
-            Q(codigo_patrimonial__icontains=search_value) |
-            Q(codigo_interno__icontains=search_value) |
-            Q(marca__icontains=search_value) |
-            Q(modelo__icontains=search_value) |
-            Q(placa__icontains=search_value)
-        )
-    if codigo:
-        has_filters = True
-        queryset = queryset.filter(codigo_patrimonial__icontains=codigo)
-    if denominacion:
-        has_filters = True
-        queryset = queryset.filter(
-            Q(denominacion__nombre__icontains=denominacion) |
-            Q(descripcion__icontains=denominacion)
-        )
-    if ubicacion:
-        has_filters = True
-        queryset = queryset.filter(
-            Q(ubicacion_fisica__detalle__icontains=ubicacion) |
-            Q(ubicacion_fisica__area__nombre__icontains=ubicacion) |
-            Q(ubicacion_fisica__oficina__nombre__icontains=ubicacion) |
-            Q(ubicacion_fisica__local__nombre__icontains=ubicacion)
-        )
-    if personal_id.isdigit():
-        has_filters = True
-        queryset = queryset.filter(usuario_asignado_id=int(personal_id))
-    if cuenta_id.isdigit():
-        has_filters = True
-        queryset = queryset.filter(cuenta_contable_id=int(cuenta_id))
-    if estado:
-        has_filters = True
-        queryset = queryset.filter(estado=estado)
-    if situacion:
-        has_filters = True
-        queryset = queryset.filter(situacion=situacion)
-    if resolucion_alta:
-        has_filters = True
-        queryset = queryset.filter(resolucion_alta__icontains=resolucion_alta)
-    if fecha_inicio:
-        try:
-            fecha_i = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
-            queryset = queryset.filter(fecha_adquisicion__gte=fecha_i)
-            has_filters = True
-        except ValueError:
-            pass
-    if fecha_fin:
-        try:
-            fecha_f = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
-            queryset = queryset.filter(fecha_adquisicion__lte=fecha_f)
-            has_filters = True
-        except ValueError:
-            pass
+    queryset, has_filters = filtrar_bienes(base_qs, params)
 
     # 3. CONTAR FILTRADOS (Rápido, porque no hay JOINs)
     records_filtered = queryset.count() if has_filters else records_total

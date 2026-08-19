@@ -44,6 +44,26 @@
                     <button type="button" class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#modalBusquedaAvanzada">
                         <i class="fas fa-filter me-1"></i>Búsqueda avanzada
                     </button>
+                    <!-- Genera el reporte detallado con los MISMOS filtros que
+                         se están viendo en la tabla (ver bienes/filtros.py). -->
+                    <div class="btn-group w-100">
+                        <button type="button" class="btn btn-outline-success dropdown-toggle w-100" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-file-download me-1"></i>Generar reporte
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Bienes activos detallado</h6></li>
+                            <li>
+                                <a class="dropdown-item btn-generar-reporte" href="#" data-formato="pdf">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>Descargar PDF
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item btn-generar-reporte" href="#" data-formato="excel">
+                                    <i class="fas fa-file-excel text-success me-2"></i>Descargar Excel
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </form>
@@ -141,10 +161,50 @@
               {% endfor %}
             </select>
           </div>
+          <div class="col-md-6">
+            <label class="form-label">Marca</label>
+            <input type="text" id="adv_marca" class="form-control" placeholder="Ej: HP, Toyota, Samsung">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Local</label>
+            <select id="adv_local" class="form-select">
+              <option value="">Seleccione...</option>
+              {% for local in locales %}
+              <option value="{{ local.id }}">{{ local.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Oficina</label>
+            <select id="adv_oficina" class="form-select">
+              <option value="">Seleccione...</option>
+              {% for oficina in oficinas %}
+              <option value="{{ oficina.id }}">{{ oficina.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" id="btnLimpiarAvanzada">Limpiar</button>
+        <button type="button" class="btn btn-outline-secondary me-auto" id="btnLimpiarAvanzada">Limpiar</button>
+        <div class="btn-group dropup">
+          <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-file-download me-1"></i>Generar reporte
+          </button>
+          <ul class="dropdown-menu">
+            <li><h6 class="dropdown-header">Bienes activos detallado</h6></li>
+            <li>
+              <a class="dropdown-item btn-generar-reporte" href="#" data-formato="pdf" data-aplicar="1">
+                <i class="fas fa-file-pdf text-danger me-2"></i>Descargar PDF
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item btn-generar-reporte" href="#" data-formato="excel" data-aplicar="1">
+                <i class="fas fa-file-excel text-success me-2"></i>Descargar Excel
+              </a>
+            </li>
+          </ul>
+        </div>
         <button type="button" class="btn btn-primary" id="btnAplicarAvanzada">Aplicar filtros</button>
       </div>
     </div>
@@ -162,18 +222,24 @@
         if (!table.length) {
             return;
         }
-        var filtrosAvanzados = {
+        // Nombres iguales a los que espera el backend (apps/bienes/filtros.py),
+        // así el mismo objeto sirve para la tabla y para el reporte.
+        var FILTROS_VACIOS = {
             codigo: '',
             denominacion: '',
-            ubicacion: '',
+            ubicacion_fisica: '',
             personal_id: '',
             cuenta_id: '',
             estado: '',
             resolucion_alta: '',
+            marca: '',
+            local_id: '',
+            oficina_id: '',
             fecha_inicio: '',
             fecha_fin: '',
             situacion: ''
         };
+        var filtrosAvanzados = Object.assign({}, FILTROS_VACIOS);
 
         const modalAvanzada = $('#modalBusquedaAvanzada');
 
@@ -241,16 +307,9 @@
                 url: datatableUrl,
                 data: function(d) {
                     d.search.value = $('#searchBienes').val() || '';
-                    d.codigo = filtrosAvanzados.codigo;
-                    d.denominacion = filtrosAvanzados.denominacion;
-                    d.ubicacion_fisica = filtrosAvanzados.ubicacion;
-                    d.personal_id = filtrosAvanzados.personal_id;
-                    d.cuenta_id = filtrosAvanzados.cuenta_id;
-                    d.estado = filtrosAvanzados.estado;
-                    d.resolucion_alta = filtrosAvanzados.resolucion_alta;
-                    d.fecha_inicio = filtrosAvanzados.fecha_inicio;
-                    d.fecha_fin = filtrosAvanzados.fecha_fin;
-                    d.situacion = filtrosAvanzados.situacion;
+                    Object.keys(FILTROS_VACIOS).forEach(function(clave) {
+                        d[clave] = filtrosAvanzados[clave];
+                    });
                 },
                 error: function(xhr) {
                     const message = (xhr && xhr.responseText) ? xhr.responseText : 'Error al cargar datos.';
@@ -265,39 +324,85 @@
             dt.search($('#searchBienes').val() || '').draw();
         });
 
+        function leerFiltrosDelModal() {
+            filtrosAvanzados = {
+                codigo: $('#adv_codigo').val().trim(),
+                denominacion: $('#adv_denominacion').val().trim(),
+                ubicacion_fisica: $('#adv_ubicacion').val().trim(),
+                personal_id: $('#adv_personal').val() || '',
+                cuenta_id: $('#adv_cuenta').val() || '',
+                estado: $('#adv_estado').val() || '',
+                resolucion_alta: $('#adv_resolucion').val().trim(),
+                marca: $('#adv_marca').val().trim(),
+                local_id: $('#adv_local').val() || '',
+                oficina_id: $('#adv_oficina').val() || '',
+                fecha_inicio: $('#adv_fecha_inicio').val() || '',
+                fecha_fin: $('#adv_fecha_fin').val() || '',
+                situacion: $('#adv_situacion').val() || ''
+            };
+        }
+
         $('#btnAplicarAvanzada').on('click', function() {
-            filtrosAvanzados.codigo = $('#adv_codigo').val().trim();
-            filtrosAvanzados.denominacion = $('#adv_denominacion').val().trim();
-            filtrosAvanzados.ubicacion = $('#adv_ubicacion').val().trim();
-            filtrosAvanzados.personal_id = $('#adv_personal').val() || '';
-            filtrosAvanzados.cuenta_id = $('#adv_cuenta').val() || '';
-            filtrosAvanzados.estado = $('#adv_estado').val() || '';
-            filtrosAvanzados.resolucion_alta = $('#adv_resolucion').val().trim();
-            filtrosAvanzados.fecha_inicio = $('#adv_fecha_inicio').val() || '';
-            filtrosAvanzados.fecha_fin = $('#adv_fecha_fin').val() || '';
-            filtrosAvanzados.situacion = $('#adv_situacion').val() || '';
+            leerFiltrosDelModal();
             $('#modalBusquedaAvanzada').modal('hide');
             dt.ajax.reload();
         });
 
         $('#btnLimpiarAvanzada').on('click', function() {
-            $('#adv_codigo, #adv_denominacion, #adv_ubicacion, #adv_resolucion').val('');
-            $('#adv_cuenta, #adv_estado, #adv_situacion').val('');
+            $('#adv_codigo, #adv_denominacion, #adv_ubicacion, #adv_resolucion, #adv_marca').val('');
+            $('#adv_cuenta, #adv_estado, #adv_situacion, #adv_local, #adv_oficina').val('');
             $('#adv_fecha_inicio, #adv_fecha_fin').val('');
             $('#adv_personal').val(null).trigger('change');
-            filtrosAvanzados = {
-                codigo: '',
-                denominacion: '',
-                ubicacion: '',
-                personal_id: '',
-                cuenta_id: '',
-                estado: '',
-                resolucion_alta: '',
-                fecha_inicio: '',
-                fecha_fin: '',
-                situacion: ''
-            };
+            filtrosAvanzados = Object.assign({}, FILTROS_VACIOS);
             dt.ajax.reload();
+        });
+
+        // ---- Generar reporte con los filtros activos ----
+        // Los reportes leen la querystring con el mismo módulo que alimenta
+        // esta tabla, así que el archivo contiene exactamente lo que se ve.
+        var URLS_REPORTE = {
+            pdf: '{% url "inventario:reporte_bienes_activos" %}',
+            excel: '{% url "inventario:reporte_excel_bienes_detallados" %}'
+        };
+
+        function querystringFiltros() {
+            var params = new URLSearchParams();
+            var busqueda = ($('#searchBienes').val() || '').trim();
+            if (busqueda) {
+                params.set('search', busqueda);
+            }
+            Object.keys(FILTROS_VACIOS).forEach(function(clave) {
+                var valor = (filtrosAvanzados[clave] || '').toString().trim();
+                if (valor) {
+                    params.set(clave, valor);
+                }
+            });
+            return params;
+        }
+
+        $(document).on('click', '.btn-generar-reporte', function(e) {
+            e.preventDefault();
+            // Si se pulsa desde el modal, primero se toman los filtros escritos
+            // (puede que el usuario no haya hecho clic en "Aplicar filtros").
+            if ($(this).data('aplicar')) {
+                leerFiltrosDelModal();
+                $('#modalBusquedaAvanzada').modal('hide');
+                dt.ajax.reload();
+            }
+            var params = querystringFiltros();
+            if (!params.toString()) {
+                var seguir = confirm(
+                    'No hay ningún filtro aplicado: el reporte incluirá TODOS los bienes activos ' +
+                    'y puede tardar bastante en generarse.\n\n¿Desea continuar?'
+                );
+                if (!seguir) {
+                    return;
+                }
+            }
+            var formato = $(this).data('formato') === 'excel' ? 'excel' : 'pdf';
+            var url = URLS_REPORTE[formato];
+            var separador = params.toString() ? '?' : '';
+            window.open(url + separador + params.toString(), '_blank');
         });
     });
 </script>
