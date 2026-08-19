@@ -66,12 +66,17 @@ def home(request):
         .order_by('-total')[:10]
     )
 
-    situacion_data = list(
-        Bien.objects.exclude(estado='BAJA')
+    # El gráfico muestra la etiqueta legible (Normal / Faltante / Sobrante),
+    # no el código guardado en BD (N / F / S).
+    _situacion_labels = dict(Bien.SITUACION_CHOICES)
+    situacion_data = [
+        {'situacion': _situacion_labels.get(fila['situacion'], fila['situacion']),
+         'total': fila['total']}
+        for fila in Bien.objects.exclude(estado='BAJA')
         .values('situacion')
         .annotate(total=Count('id'))
         .order_by('-total')
-    )
+    ]
 
     context = {
         'total_bienes': total_bienes,
@@ -439,11 +444,7 @@ def importar_inventario_view(request):
             if estado_val not in dict(Bien.ESTADO_BIEN):
                 estado_val = 'BUENO'
 
-            situacion_val = (_valor('situacion', row) or 'USO').upper()
-            if 'DESUSO' in situacion_val:
-                situacion_val = 'DESUSO'
-            elif situacion_val not in dict(Bien.SITUACION_CHOICES):
-                situacion_val = 'USO'
+            situacion_val = Bien.normalizar_situacion(_valor('situacion', row))
 
             anio_fabricacion_val = _valor('anio_fabricacion', row)
             anio_fabricacion = int(anio_fabricacion_val) if anio_fabricacion_val.isdigit() else None

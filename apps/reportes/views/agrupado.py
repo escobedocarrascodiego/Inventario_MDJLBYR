@@ -130,7 +130,7 @@ CRITERIOS = {
     },
     'situacion': {
         'label': 'Situación',
-        'titulo': 'REPORTE DE BIENES POR SITUACIÓN (USO / DESUSO)',
+        'titulo': 'REPORTE DE BIENES POR SITUACIÓN (NORMAL / FALTANTE / SOBRANTE)',
         'clave': lambda b: b.get_situacion_display(),
     },
     'forma_adquisicion': {

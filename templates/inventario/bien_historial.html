@@ -27,7 +27,7 @@
                 <p><strong>Grupo Genérico:</strong> {{ bien.grupo_generico|default:"-" }}</p>
                 <p><strong>Clase:</strong> {{ bien.clase|default:"-" }}</p>
                 <p><strong>Situación:</strong>
-                    <span class="badge {% if bien.situacion == 'USO' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    <span class="badge {% if bien.situacion == 'N' %}bg-success{% elif bien.situacion == 'S' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
                         {{ bien.get_situacion_display }}
                     </span>
                     <span class="ms-2"><strong>Estado:</strong></span>

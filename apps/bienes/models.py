@@ -127,15 +127,16 @@ class Bien(models.Model):
     ]
     estado = models.CharField(max_length=15, choices=ESTADO_BIEN, default='BUENO')
 
-    # --- Situación (Uso / Desuso) ---
+    # --- Situación (verificación de inventario: Normal / Faltante / Sobrante) ---
     SITUACION_CHOICES = [
-        ('USO', 'En Uso'),
-        ('DESUSO', 'En Desuso'),
+        ('N', 'Normal'),
+        ('F', 'Faltante'),
+        ('S', 'Sobrante'),
     ]
     situacion = models.CharField(
         max_length=10,
         choices=SITUACION_CHOICES,
-        default='USO',
+        default='N',
         verbose_name="Situación"
     )
     
@@ -170,6 +171,23 @@ class Bien(models.Model):
     # Aquí puedes guardar un JSON como texto si SQL Server te da problemas con JSON nativo
     # Ej: {"procesador": "i7", "ram": "16GB"}
     otros_detalles = models.TextField(blank=True, null=True, help_text="Especificaciones adicionales en formato texto")
+
+    @classmethod
+    def normalizar_situacion(cls, valor):
+        """Convierte un valor libre (Excel/CSV) al código de situación N/F/S.
+
+        Acepta el código ('F') o el nombre completo ('FALTANTE', 'Faltante').
+        Cualquier otra cosa -vacío, valores antiguos tipo USO/DESUSO, basura-
+        cae en 'N' (Normal), que es el estado por defecto del inventario.
+        """
+        texto = (valor or '').strip().upper()
+        if texto.startswith('F'):
+            return 'F'
+        if texto.startswith('S'):
+            return 'S'
+        if texto in dict(cls.SITUACION_CHOICES):
+            return texto
+        return 'N'
 
     def _fecha_inicio_depreciacion(self):
         """Fecha desde la que se cuenta la depreciación.
