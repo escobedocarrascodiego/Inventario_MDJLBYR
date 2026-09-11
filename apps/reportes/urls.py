@@ -34,7 +34,7 @@ urlpatterns = [
     path('funciones/fichas/computo/<int:bien_id>/', views.generar_ficha_computo, name='ficha_computo'),
     path('funciones/fichas/vehiculo/<int:bien_id>/', views.generar_ficha_vehiculo, name='ficha_vehiculo'),
 
-    # URLs para Ficha Anexo N° 03 (Asignación en uso y devolución)
+    # URLs para Ficha Anexo N° 03 (Asignación en uso de bienes muebles patrimoniales)
     path('funciones/fichas/anexo03/', views.ficha_anexo03_index, name='ficha_anexo03_index'),
     path('ajax/anexo03/buscar-personal/', views.buscar_personal_anexo03, name='buscar_personal_anexo03'),
     path('ajax/anexo03/datos-personal/', views.datos_personal_anexo03, name='datos_personal_anexo03'),

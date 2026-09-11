@@ -90,6 +90,26 @@ class UbicacionFisica(models.Model):
         if self.oficina and self.oficina.area_id != self.area_id:
             raise ValidationError("La oficina seleccionada no pertenece al área indicada.")
 
+        # Un mismo ambiente no puede estar dado de alta dos veces: si no, el
+        # mismo "Almacen" aparece repetido en los listados y en las fichas.
+        detalle = ' '.join((self.detalle or '').split())
+        self.detalle = detalle or None
+        if self.local_id and self.area_id:
+            repetida = UbicacionFisica.objects.filter(
+                local_id=self.local_id,
+                area_id=self.area_id,
+                oficina_id=self.oficina_id,
+                piso=self.piso,
+            ).exclude(pk=self.pk)
+            if self.detalle:
+                repetida = repetida.filter(detalle__iexact=self.detalle)
+            else:
+                repetida = repetida.filter(detalle__isnull=True)
+            if repetida.exists():
+                raise ValidationError(
+                    "Ya existe esta ubicación física: %s" % repetida.first()
+                )
+
     def __str__(self):
         partes = []
         if self.area:

@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Ficha Anexo N° 03 - Asignación en Uso{% endblock %}
+{% block title %}Ficha de Asignación en Uso de Bienes Muebles Patrimoniales{% endblock %}
 
-{% block page_title %}Ficha Anexo N° 03{% endblock %}
+{% block page_title %}Ficha de Asignación en Uso de Bienes Muebles Patrimoniales{% endblock %}
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
@@ -29,7 +29,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <span class="badge bg-primary badge-anexo mb-2">ANEXO N° 03</span>
-                <h3 class="mb-0">Ficha de Asignación en Uso y Devolución de Bienes Muebles Patrimoniales</h3>
+                <h3 class="mb-0">FICHA DE ASIGNACIÓN EN USO DE BIENES MUEBLES PATRIMONIALES</h3>
             </div>
             <a href="{% url 'inventario:fichas_index' %}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Volver a Fichas
@@ -125,13 +125,27 @@
             <div id="contenedorBienes" class="d-none">
                 <!-- Filtros -->
                 <div class="bg-light border rounded p-3 mb-3">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5">
+                    <div class="row g-2 align-items-end mb-2">
+                        <div class="col-md-12">
                             <label class="form-label small mb-1"><strong><i class="fas fa-search me-1"></i>Buscar:</strong></label>
                             <input type="text" id="filtroTexto" class="form-control form-control-sm"
-                                   placeholder="Código, denominación, marca, modelo, serie, OC...">
+                                   placeholder="Código, denominación, marca, modelo, serie, OC, ubicación física, oficina, área, local...">
                         </div>
-                        <div class="col-md-3">
+                    </div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1"><strong><i class="fas fa-map-marker-alt me-1"></i>Ubicación física:</strong></label>
+                            <select id="filtroUbicacion" class="form-select form-select-sm">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1"><strong>Oficina:</strong></label>
+                            <select id="filtroOficina" class="form-select form-select-sm">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label small mb-1"><strong>Estado:</strong></label>
                             <select id="filtroEstado" class="form-select form-select-sm">
                                 <option value="">Todos</option>
@@ -143,10 +157,10 @@
                                 <option value="RAEE">RAEE</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1"><strong>OC / Resol. Alta:</strong></label>
+                        <div class="col-md-1">
+                            <label class="form-label small mb-1"><strong>OC:</strong></label>
                             <input type="text" id="filtroResolucion" class="form-control form-control-sm"
-                                   placeholder="Ej: 2211, OC/2122...">
+                                   placeholder="2211...">
                         </div>
                         <div class="col-md-1">
                             <button type="button" id="btnLimpiarFiltros" class="btn btn-sm btn-outline-secondary w-100" title="Limpiar filtros">
@@ -180,6 +194,7 @@
                                 <th style="width: 90px;">Marca</th>
                                 <th style="width: 90px;">Modelo</th>
                                 <th style="width: 105px;">Serie</th>
+                                <th style="width: 130px;">Ubicación Física</th>
                                 <th style="width: 110px;">OC / Resol. Alta</th>
                                 <th style="width: 90px;">Estado</th>
                             </tr>
@@ -292,12 +307,14 @@ $(document).ready(function() {
         $('#mensajeSinUsuario').addClass('d-none');
         $('#contenedorBienes').removeClass('d-none');
         $('#mensajeSinResultados').addClass('d-none');
-        $('#tbodyBienes').html('<tr><td colspan="8" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando bienes...</td></tr>');
+        $('#tbodyBienes').html('<tr><td colspan="9" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando bienes...</td></tr>');
 
         // Limpiar filtros previos al cambiar de usuario
         $('#filtroTexto').val('');
         $('#filtroEstado').val('');
         $('#filtroResolucion').val('');
+        $('#filtroUbicacion').val('');
+        $('#filtroOficina').val('');
 
         $.ajax({
             url: '{% url "inventario:bienes_personal_anexo03" %}',
@@ -317,17 +334,22 @@ $(document).ready(function() {
                 $('#mensajeSinBienes').addClass('d-none');
 
                 data.bienes.forEach(function(bien) {
-                    // Texto concatenado para búsqueda rápida (data-search)
+                    // Texto concatenado para búsqueda rápida (data-search). Incluye
+                    // dónde está el bien para poder buscar por "almacen", "maestranza",
+                    // el nombre de la oficina, del área o del local.
                     const searchBlob = [
                         bien.codigo_patrimonial, bien.denominacion, bien.marca,
-                        bien.modelo, bien.serie, bien.color, bien.resolucion_alta
+                        bien.modelo, bien.serie, bien.color, bien.resolucion_alta,
+                        bien.ubicacion_fisica, bien.oficina, bien.area, bien.local
                     ].join(' ').toLowerCase();
 
                     const row = `
                         <tr class="fila-bien"
                             data-estado="${bien.estado}"
                             data-resolucion="${(bien.resolucion_alta || '').toLowerCase()}"
-                            data-search="${escapeHtml(searchBlob)}">
+                            data-ubicacion="${escapeAttr(bien.ubicacion_fisica)}"
+                            data-oficina="${escapeAttr(bien.oficina)}"
+                            data-search="${escapeAttr(searchBlob)}">
                             <td class="text-center">
                                 <input type="checkbox" name="bien_ids" value="${bien.id}" class="form-check-input chk-bien" checked>
                             </td>
@@ -336,6 +358,7 @@ $(document).ready(function() {
                             <td>${escapeHtml(bien.marca)}</td>
                             <td>${escapeHtml(bien.modelo)}</td>
                             <td>${escapeHtml(bien.serie)}</td>
+                            <td><small>${escapeHtml(bien.ubicacion_fisica)}</small></td>
                             <td>${escapeHtml(bien.resolucion_alta)}</td>
                             <td><span class="badge bg-${badgeColor(bien.estado)}">${escapeHtml(bien.estado_label)}</span></td>
                         </tr>
@@ -343,14 +366,40 @@ $(document).ready(function() {
                     tbody.append(row);
                 });
 
+                llenarSelect('#filtroUbicacion', data.bienes.map(b => b.ubicacion_fisica), 'Sin ubicación física');
+                llenarSelect('#filtroOficina', data.bienes.map(b => b.oficina), 'Sin oficina');
+
                 aplicarFiltros();
                 actualizarContador();
                 $('#btnGenerarPDF').prop('disabled', false);
             },
             error: function() {
-                $('#tbodyBienes').html('<tr><td colspan="8" class="text-center text-danger">Error al cargar los bienes.</td></tr>');
+                $('#tbodyBienes').html('<tr><td colspan="9" class="text-center text-danger">Error al cargar los bienes.</td></tr>');
             }
         });
+    }
+
+    // Valor que representa "el bien no tiene ese dato" en los desplegables
+    // (ninguna ubicación ni oficina real se llama así).
+    const SIN_DATO = '::sin-dato::';
+
+    // Llena un desplegable con los valores distintos que traen los bienes del
+    // usuario (ubicación física, oficina...), ordenados alfabéticamente.
+    function llenarSelect(selector, valores, etiquetaVacia) {
+        const $select = $(selector);
+        const opcionTodas = $select.find('option').first().text();
+        const distintos = [...new Set(valores.map(v => (v || '').trim()))];
+        const hayVacios = distintos.includes('');
+        const conValor = distintos.filter(v => v !== '').sort((a, b) => a.localeCompare(b, 'es'));
+
+        $select.empty().append($('<option>').val('').text(opcionTodas));
+        conValor.forEach(function(valor) {
+            $select.append($('<option>').val(valor).text(valor));
+        });
+        if (hayVacios) {
+            $select.append($('<option>').val(SIN_DATO).text(etiquetaVacia));
+        }
+        $select.val('');
     }
 
     // ====== FILTROS EN VIVO ======
@@ -358,6 +407,8 @@ $(document).ready(function() {
         const texto = ($('#filtroTexto').val() || '').trim().toLowerCase();
         const estado = $('#filtroEstado').val() || '';
         const resolucion = ($('#filtroResolucion').val() || '').trim().toLowerCase();
+        const ubicacion = $('#filtroUbicacion').val() || '';
+        const oficina = $('#filtroOficina').val() || '';
 
         let visibles = 0;
         $('#tbodyBienes tr.fila-bien').each(function() {
@@ -365,12 +416,19 @@ $(document).ready(function() {
             const blob = $fila.attr('data-search') || '';
             const estadoFila = $fila.attr('data-estado') || '';
             const resolucionFila = $fila.attr('data-resolucion') || '';
+            const ubicacionFila = $fila.attr('data-ubicacion') || '';
+            const oficinaFila = $fila.attr('data-oficina') || '';
 
             const coincideTexto = !texto || blob.indexOf(texto) > -1;
             const coincideEstado = !estado || estadoFila === estado;
             const coincideResolucion = !resolucion || resolucionFila.indexOf(resolucion) > -1;
+            const coincideUbicacion = !ubicacion ||
+                (ubicacion === SIN_DATO ? ubicacionFila === '' : ubicacionFila === ubicacion);
+            const coincideOficina = !oficina ||
+                (oficina === SIN_DATO ? oficinaFila === '' : oficinaFila === oficina);
 
-            if (coincideTexto && coincideEstado && coincideResolucion) {
+            if (coincideTexto && coincideEstado && coincideResolucion &&
+                coincideUbicacion && coincideOficina) {
                 $fila.show();
                 visibles++;
             } else {
@@ -391,17 +449,31 @@ $(document).ready(function() {
 
     // Listeners de filtros (en vivo)
     $('#filtroTexto, #filtroResolucion').on('input', aplicarFiltros);
-    $('#filtroEstado').on('change', aplicarFiltros);
+    $('#filtroEstado, #filtroUbicacion, #filtroOficina').on('change', aplicarFiltros);
     $('#btnLimpiarFiltros').on('click', function() {
         $('#filtroTexto').val('');
         $('#filtroEstado').val('');
         $('#filtroResolucion').val('');
+        $('#filtroUbicacion').val('');
+        $('#filtroOficina').val('');
         aplicarFiltros();
     });
 
     function escapeHtml(text) {
         if (text === null || text === undefined || text === '') return '-';
         return $('<div>').text(text).html();
+    }
+
+    // Para atributos data-*: a diferencia de escapeHtml, deja el vacío como vacío
+    // (los filtros comparan contra '') y escapa también las comillas.
+    function escapeAttr(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function badgeColor(estado) {

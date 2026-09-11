@@ -517,7 +517,7 @@ def generar_ficha_vehiculo(request, bien_id):
 
 
 # ==============================================================================
-# ANEXO N° 03 - FICHA DE ASIGNACIÓN EN USO Y DEVOLUCIÓN DE BIENES PATRIMONIALES
+# ANEXO N° 03 - FICHA DE ASIGNACIÓN EN USO DE BIENES MUEBLES PATRIMONIALES
 # ==============================================================================
 
 def _meses_es():
@@ -525,6 +525,33 @@ def _meses_es():
         '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
     ]
+
+
+def _etiqueta_ubicacion_fisica(ubicacion):
+    """Nombre CORTO del ambiente, tal como debe salir en el Anexo N° 03.
+
+    El Órgano y la Oficina van en sus propias filas de la ficha, así que aquí
+    solo interesa el ambiente: "Almacen", "Planillas", "Piso 3"... (el __str__
+    del modelo repite área + oficina + local y no sirve para esa fila).
+    """
+    if ubicacion is None:
+        return ''
+    detalle = (ubicacion.detalle or '').strip()
+    if detalle:
+        return detalle
+    if ubicacion.piso is not None:
+        return f"Piso {ubicacion.piso}"
+    return ubicacion.local.nombre if ubicacion.local else ''
+
+
+def _distintos(valores):
+    """Valores no vacíos, sin repetir y conservando el orden de aparición."""
+    unicos = []
+    for valor in valores:
+        valor = (valor or '').strip()
+        if valor and valor not in unicos:
+            unicos.append(valor)
+    return unicos
 
 
 def ficha_anexo03_index(request):
@@ -596,7 +623,10 @@ def bienes_personal_anexo03(request):
     if not personal_id or not str(personal_id).isdigit():
         return JsonResponse({'error': 'ID inválido', 'bienes': []}, status=400)
 
-    bienes = Bien.objects.select_related('denominacion').filter(
+    bienes = Bien.objects.select_related(
+        'denominacion', 'local', 'area', 'oficina',
+        'ubicacion_fisica', 'ubicacion_fisica__local',
+    ).filter(
         usuario_asignado_id=int(personal_id)
     ).exclude(estado='BAJA').order_by('codigo_patrimonial')
 
@@ -614,6 +644,12 @@ def bienes_personal_anexo03(request):
             'resolucion_alta': b.resolucion_alta or '',
             'estado': b.estado,
             'estado_label': b.get_estado_display(),
+            # Dónde está el bien: permite filtrar la ficha por ambiente
+            # (ej. sacar solo los bienes que están en "Almacen").
+            'local': b.local.nombre if b.local else '',
+            'area': b.area.nombre if b.area else '',
+            'oficina': b.oficina.nombre if b.oficina else '',
+            'ubicacion_fisica': _etiqueta_ubicacion_fisica(b.ubicacion_fisica),
         })
 
     return JsonResponse({'bienes': data})
@@ -636,12 +672,17 @@ def generar_ficha_anexo03(request):
         pk=personal_id
     )
 
-    bienes = Bien.objects.select_related('denominacion').filter(
-        pk__in=bien_ids,
-        usuario_asignado_id=personal.id
-    ).exclude(estado='BAJA').order_by('codigo_patrimonial')
+    bienes = list(
+        Bien.objects.select_related(
+            'denominacion', 'local', 'area', 'oficina',
+            'ubicacion_fisica', 'ubicacion_fisica__local',
+        ).filter(
+            pk__in=bien_ids,
+            usuario_asignado_id=personal.id
+        ).exclude(estado='BAJA').order_by('codigo_patrimonial')
+    )
 
-    if not bienes.exists():
+    if not bienes:
         return HttpResponse("No se encontraron bienes válidos para este usuario.", status=400)
 
     # Fecha de la ficha
@@ -652,8 +693,21 @@ def generar_ficha_anexo03(request):
 
     # Datos institucionales / ubicación
     local_obj = personal.area.local if (personal.area and personal.area.local) else None
-    area_nombre = personal.area.nombre if personal.area else ''
     local_nombre = local_obj.nombre if local_obj else ''
+
+    # Órgano, oficina y ambiente se leen de los BIENES seleccionados, no de la
+    # ficha del trabajador: es donde están realmente los bienes que se entregan
+    # (un almacenero puede figurar sin oficina y tener bienes en el "Almacen").
+    # Si los bienes no lo traen, se cae al dato del trabajador.
+    area_nombre = ' / '.join(_distintos(b.area.nombre if b.area else '' for b in bienes)) or (
+        personal.area.nombre if personal.area else ''
+    )
+    oficina_nombre = ' / '.join(_distintos(b.oficina.nombre if b.oficina else '' for b in bienes)) or (
+        personal.oficina.nombre if personal.oficina else ''
+    )
+    ubicacion_nombre = ' / '.join(
+        _distintos(_etiqueta_ubicacion_fisica(b.ubicacion_fisica) for b in bienes)
+    )
     # La dirección se toma del Local o sede (no es la dirección del trabajador).
     direccion = local_obj.direccion if (local_obj and local_obj.direccion) else ''
     entidad_nombre = entidad_input or (
@@ -706,7 +760,7 @@ def generar_ficha_anexo03(request):
     # Encabezado: ANEXO N° 03 + título
     elements.append(Paragraph("ANEXO N° 03", title_style))
     elements.append(Paragraph(
-        "FICHA DE ASIGNACIÓN EN USO Y DEVOLUCIÓN DE BIENES MUEBLES PATRIMONIALES",
+        "FICHA DE ASIGNACIÓN EN USO DE BIENES MUEBLES PATRIMONIALES",
         title_style
     ))
     elements.append(Spacer(1, 0.4 * cm))
@@ -760,6 +814,16 @@ def generar_ficha_anexo03(request):
             '', '',
         ],
         [
+            Paragraph("Oficina", cell_style),
+            Paragraph(oficina_nombre, cell_style),
+            '', '',
+        ],
+        [
+            Paragraph("Ubicación Física", cell_style),
+            Paragraph(ubicacion_nombre, cell_style),
+            '', '',
+        ],
+        [
             Paragraph("Local o sede", cell_style),
             Paragraph(local_nombre, cell_style),
             '', '',
@@ -778,6 +842,8 @@ def generar_ficha_anexo03(request):
         ('SPAN', (1, 3), (3, 3)),
         ('SPAN', (1, 4), (3, 4)),
         ('SPAN', (1, 5), (3, 5)),
+        ('SPAN', (1, 6), (3, 6)),
+        ('SPAN', (1, 7), (3, 7)),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTSIZE', (0, 0), (-1, -1), 8),
