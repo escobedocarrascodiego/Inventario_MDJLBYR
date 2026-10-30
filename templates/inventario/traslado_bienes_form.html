@@ -269,6 +269,115 @@
     </div>
 </div>
 
+{% if puede_editar_traslado %}
+<!-- Modal para Editar Traslado -->
+<div class="modal fade" id="modalEditarTraslado" tabindex="-1" aria-labelledby="modalEditarTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="modalEditarTrasladoLabel">
+                    <i class="fas fa-edit me-2"></i>Editar Traslado <small id="editFechaTraslado" class="ms-2"></small>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="editCargando" class="text-center py-5">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                </div>
+                <div id="editContenido" class="d-none">
+                    <div id="editAvisoBloqueo" class="alert alert-warning d-none" role="alert">
+                        <i class="fas fa-lock me-2"></i>Algunos bienes de este traslado ya fueron movidos o
+                        modificados después. Solo se puede cambiar el <strong>documento que autoriza</strong>
+                        y quitar los bienes que no estén bloqueados.
+                    </div>
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Ubicación Destino</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Usuario:</strong></label>
+                                        <select id="edit_usuario_destino" class="form-select">
+                                            <option value="">Seleccione...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Local:</strong></label>
+                                        <select id="edit_local_destino" class="form-select">
+                                            <option value="">Seleccione...</option>
+                                            {% for local in locales %}
+                                            <option value="{{ local.id }}">{{ local.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>&Aacute;rea:</strong></label>
+                                        <select id="edit_area_destino" class="form-select">
+                                            <option value="">Seleccione...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Oficina:</strong></label>
+                                        <select id="edit_oficina_destino" class="form-select">
+                                            <option value="">Seleccione...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Ubicación física:</strong></label>
+                                        <select id="edit_ubicacion_destino" class="form-select">
+                                            <option value="">Seleccione...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-0">
+                                        <label class="form-label"><strong>Documento que autoriza el Traslado:</strong></label>
+                                        <input type="text" id="edit_documento_autoriza" class="form-control"
+                                               placeholder="Ej: Informe 115/2026" maxlength="255">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-boxes me-2"></i>Bienes del Traslado</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-2">
+                                        Marque <strong>Quitar</strong> para retirar un bien del traslado: el bien
+                                        vuelve a su usuario y ubicación de origen.
+                                    </p>
+                                    <div class="border rounded" style="max-height: 420px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th>CODIGO</th>
+                                                    <th>DESCRIPCION</th>
+                                                    <th>ORIGEN</th>
+                                                    <th class="text-center">QUITAR</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tbodyEditBienes"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnGuardarEdicionTraslado" disabled>
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_css %}
@@ -974,6 +1083,14 @@ function buscarTraslados() {
                                    title="Imprimir Ficha">
                                     <i class="fas fa-print"></i> Imprimir
                                 </a>
+                                {% if puede_editar_traslado %}
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-warning mt-1 btn-editar-traslado"
+                                        data-traslado-id="${traslado.traslado_id}"
+                                        title="Editar Traslado">
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                                {% endif %}
                             </td>
                         </tr>
                     `;
@@ -991,5 +1108,276 @@ function buscarTraslados() {
         }
     });
 }
+
+{% if puede_editar_traslado %}
+// ==============================================================================
+// Edición de traslados
+// ==============================================================================
+let edicionTraslado = null;      // datos cargados del traslado en edición
+let reabrirReportes = false;     // volver al modal de reportes al cerrar la edición
+
+function escapeHtml(texto) {
+    return String(texto == null ? '' : texto)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function editCargarAreas(localId, areaId, callback) {
+    const select = $('#edit_area_destino');
+    select.html('<option value="">Seleccione...</option>');
+    $('#edit_oficina_destino, #edit_ubicacion_destino').html('<option value="">Seleccione...</option>');
+    if (!localId) { if (callback) callback(); return; }
+    $.ajax({
+        url: '{% url "inventario:obtener_areas_por_local" %}',
+        data: { local_id: localId },
+        success: function(r) {
+            (r.areas || []).forEach(function(a) {
+                select.append(`<option value="${a.id}">${escapeHtml(a.nombre)}${a.siglas ? ' (' + escapeHtml(a.siglas) + ')' : ''}</option>`);
+            });
+            if (areaId) select.val(String(areaId));
+            if (callback) callback();
+        },
+        error: function() { if (callback) callback(); }
+    });
+}
+
+function editCargarOficinas(areaId, oficinaId, callback) {
+    const select = $('#edit_oficina_destino');
+    select.html('<option value="">Seleccione...</option>');
+    if (!areaId) { if (callback) callback(); return; }
+    $.ajax({
+        url: '{% url "inventario:obtener_oficinas_por_area" %}',
+        data: { area_id: areaId },
+        success: function(r) {
+            (r.oficinas || []).forEach(function(o) {
+                select.append(`<option value="${o.id}">${escapeHtml(o.nombre)}</option>`);
+            });
+            if (oficinaId) select.val(String(oficinaId));
+            if (callback) callback();
+        },
+        error: function() { if (callback) callback(); }
+    });
+}
+
+function editCargarUbicaciones(areaId, oficinaId, ubicacionId, callback) {
+    const select = $('#edit_ubicacion_destino');
+    select.html('<option value="">Seleccione...</option>');
+    if (!areaId && !oficinaId) { if (callback) callback(); return; }
+    $.ajax({
+        url: '{% url "inventario:obtener_ubicaciones_fisicas" %}',
+        data: { area_id: areaId || '', oficina_id: oficinaId || '' },
+        success: function(r) {
+            (r.ubicaciones || []).forEach(function(u) {
+                select.append(`<option value="${u.id}">${escapeHtml(u.nombre)}</option>`);
+            });
+            if (ubicacionId) select.val(String(ubicacionId));
+            if (callback) callback();
+        },
+        error: function() { if (callback) callback(); }
+    });
+}
+
+// Carga la cascada completa Local > Área > Oficina > Ubicación con valores preseleccionados
+function editAplicarUbicacion(localId, areaId, oficinaId, ubicacionId, callback) {
+    $('#edit_local_destino').val(localId ? String(localId) : '');
+    editCargarAreas(localId, areaId, function() {
+        editCargarOficinas(areaId, oficinaId, function() {
+            editCargarUbicaciones(areaId, oficinaId, ubicacionId, callback);
+        });
+    });
+}
+
+function abrirEdicionTraslado(trasladoId) {
+    edicionTraslado = null;
+    $('#editCargando').removeClass('d-none');
+    $('#editContenido').addClass('d-none');
+    $('#editFechaTraslado').text('');
+    $('#btnGuardarEdicionTraslado').prop('disabled', true);
+
+    // Se espera a que el modal de reportes termine de cerrarse antes de abrir la edición
+    reabrirReportes = true;
+    $('#modalReportesTraslado').one('hidden.bs.modal', function() {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarTraslado')).show();
+    });
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalReportesTraslado')).hide();
+
+    $.ajax({
+        url: '{% url "inventario:detalle_traslado" 999 %}'.replace('999', trasladoId),
+        method: 'GET',
+        success: function(r) {
+            if (!r.success) {
+                alert('Error: ' + (r.error || 'No se pudo cargar el traslado.'));
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarTraslado')).hide();
+                return;
+            }
+            edicionTraslado = r;
+            const fecha = new Date(r.fecha_traslado).toLocaleString('es-PE', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            $('#editFechaTraslado').text('(' + fecha + ')');
+
+            const d = r.destino;
+            $('#edit_usuario_destino').empty()
+                .append(new Option(d.usuario_nombre, d.usuario_id, true, true))
+                .trigger('change.select2');
+            $('#edit_documento_autoriza').val(r.documento_autoriza || '');
+
+            // Bienes del traslado
+            const tbody = $('#tbodyEditBienes').empty();
+            r.bienes.forEach(function(b) {
+                const origen = [b.usuario_origen, b.oficina_origen !== '-' ? b.oficina_origen : b.area_origen]
+                    .map(escapeHtml).join('<br>');
+                const quitar = b.bloqueado
+                    ? `<i class="fas fa-lock text-warning" title="${escapeHtml(b.motivo_bloqueo)}"></i>`
+                    : `<input type="checkbox" class="form-check-input chk-quitar-bien" value="${b.traslado_id}">`;
+                tbody.append(`
+                    <tr${b.bloqueado ? ' class="table-warning"' : ''}>
+                        <td><small>${escapeHtml(b.codigo_patrimonial)}</small></td>
+                        <td><small>${escapeHtml(b.descripcion)}</small>${b.bloqueado ? `<br><small class="text-danger">${escapeHtml(b.motivo_bloqueo)}</small>` : ''}</td>
+                        <td><small>${origen}</small></td>
+                        <td class="text-center">${quitar}</td>
+                    </tr>
+                `);
+            });
+
+            // Si algún bien ya cambió después del traslado, el destino no se puede modificar
+            const bloquearDestino = r.hay_bloqueados;
+            $('#editAvisoBloqueo').toggleClass('d-none', !bloquearDestino);
+            $('#edit_usuario_destino, #edit_local_destino, #edit_area_destino, #edit_oficina_destino, #edit_ubicacion_destino')
+                .prop('disabled', bloquearDestino);
+
+            editAplicarUbicacion(d.local_id, d.area_id, d.oficina_id, d.ubicacion_id, function() {
+                $('#editCargando').addClass('d-none');
+                $('#editContenido').removeClass('d-none');
+                $('#btnGuardarEdicionTraslado').prop('disabled', false);
+            });
+        },
+        error: function(xhr) {
+            const msg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'No se pudo cargar el traslado.';
+            alert('Error: ' + msg);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarTraslado')).hide();
+        }
+    });
+}
+
+function guardarEdicionTraslado() {
+    if (!edicionTraslado) return;
+
+    const usuarioId = $('#edit_usuario_destino').val();
+    const localId = $('#edit_local_destino').val();
+    if (!usuarioId) { alert('Debe seleccionar el usuario destino.'); return; }
+    if (!localId) { alert('Debe seleccionar el local destino.'); return; }
+
+    const quitarIds = $('#tbodyEditBienes .chk-quitar-bien:checked').map(function() {
+        return parseInt($(this).val());
+    }).get();
+    const total = edicionTraslado.bienes.length;
+
+    let confirmacion = '¿Está seguro de guardar los cambios del traslado?\n\n'
+        + 'Los bienes del traslado se actualizarán con el nuevo destino.';
+    if (quitarIds.length === total) {
+        confirmacion = `Ha marcado TODOS los bienes (${total}) para quitar.\n\n`
+            + 'Esto ANULARÁ el traslado: los bienes volverán a su usuario y ubicación de origen '
+            + 'y el registro del traslado se eliminará.\n\n¿Desea continuar?';
+    } else if (quitarIds.length > 0) {
+        confirmacion += `\n\nSe quitarán ${quitarIds.length} bien(es) del traslado; volverán a su usuario y ubicación de origen.`;
+    }
+    if (!confirm(confirmacion)) return;
+
+    const btn = $('#btnGuardarEdicionTraslado');
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Guardando...');
+
+    $.ajax({
+        url: '{% url "inventario:editar_traslado" 999 %}'.replace('999', edicionTraslado.traslado_id),
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+        contentType: 'application/json',
+        data: JSON.stringify({
+            'usuario_destino_id': usuarioId,
+            'local_destino_id': localId,
+            'area_destino_id': $('#edit_area_destino').val() || '',
+            'oficina_destino_id': $('#edit_oficina_destino').val() || '',
+            'ubicacion_destino_id': $('#edit_ubicacion_destino').val() || '',
+            'documento_autoriza': $('#edit_documento_autoriza').val() || '',
+            'quitar_traslado_ids': quitarIds
+        }),
+        success: function(r) {
+            btn.prop('disabled', false).html('<i class="fas fa-save me-2"></i>Guardar Cambios');
+            if (!r.success) {
+                alert('Error: ' + (r.error || 'No se pudo editar el traslado.'));
+                return;
+            }
+            if (r.traslado_id) {
+                if (confirm(r.message + '\n\n¿Desea imprimir la ficha de asignación actualizada?')) {
+                    window.open('{% url "inventario:reporte_asignacion_traslado" 999 %}'.replace('999', r.traslado_id), '_blank');
+                }
+            } else {
+                alert(r.message);
+            }
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarTraslado')).hide();
+        },
+        error: function(xhr) {
+            btn.prop('disabled', false).html('<i class="fas fa-save me-2"></i>Guardar Cambios');
+            const msg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Error al editar el traslado. Intente nuevamente.';
+            alert('Error: ' + msg);
+        }
+    });
+}
+
+$(document).ready(function() {
+    $('#edit_usuario_destino').select2({
+        placeholder: 'Seleccione...',
+        width: '100%',
+        minimumInputLength: 2,
+        dropdownParent: $('#modalEditarTraslado'),
+        ajax: {
+            url: '{% url "inventario:buscar_personal" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) { return { q: params.term || '' }; },
+            processResults: function(data) { return { results: data.results || [] }; },
+            cache: true
+        }
+    });
+
+    // Al elegir otro usuario destino, proponer su ubicación (igual que en el traslado)
+    $('#edit_usuario_destino').on('select2:select', function(e) {
+        const url = '{% url "inventario:obtener_ubicacion_usuario" 999 %}'.replace('999', e.params.data.id);
+        $.get(url, function(r) {
+            if (r.local_id) {
+                editAplicarUbicacion(r.local_id, r.area_id, r.oficina_id, null);
+            }
+        });
+    });
+
+    $('#edit_local_destino').on('change', function() {
+        editCargarAreas($(this).val(), null);
+    });
+    $('#edit_area_destino').on('change', function() {
+        const areaId = $(this).val();
+        editCargarOficinas(areaId, null, function() {
+            editCargarUbicaciones(areaId, $('#edit_oficina_destino').val(), null);
+        });
+    });
+    $('#edit_oficina_destino').on('change', function() {
+        editCargarUbicaciones($('#edit_area_destino').val(), $(this).val(), null);
+    });
+
+    $('#tbodyTraslados').on('click', '.btn-editar-traslado', function() {
+        abrirEdicionTraslado($(this).data('traslado-id'));
+    });
+    $('#btnGuardarEdicionTraslado').on('click', guardarEdicionTraslado);
+
+    // Al cerrar la edición se vuelve a la lista de reportes y se refresca la búsqueda
+    $('#modalEditarTraslado').on('hidden.bs.modal', function() {
+        edicionTraslado = null;
+        if (reabrirReportes) {
+            reabrirReportes = false;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalReportesTraslado')).show();
+            buscarTraslados();
+        }
+    });
+});
+{% endif %}
 </script>
 {% endblock %}

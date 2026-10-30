@@ -82,7 +82,7 @@ def _logo_flowable(styles, label_style, tamano=1.5 * cm):
         'LogoText', parent=styles['Normal'], fontSize=6,
         fontName='Helvetica', alignment=TA_CENTER
     )
-    pie = Paragraph("Software Inventario Mobiliario Institucional", texto_style)
+    pie = Paragraph("Control Patrimonial", texto_style)
 
     if os.path.exists(logo_path):
         try:
@@ -126,8 +126,8 @@ def cabecera_reporte(titulo, filtros_texto=None, ancho_total=18 * cm, dependenci
     """
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        'ReportTitle', parent=styles['Heading1'], fontSize=14,
-        textColor=colors.HexColor('#0066CC'), spaceAfter=10,
+        'ReportTitle', parent=styles['Heading1'], fontSize=13,
+        textColor=colors.HexColor('#1B365D'), spaceAfter=6,
         alignment=TA_CENTER, fontName='Helvetica-Bold'
     )
     label_style = ParagraphStyle(

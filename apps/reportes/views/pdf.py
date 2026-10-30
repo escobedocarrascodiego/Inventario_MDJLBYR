@@ -17,6 +17,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.pdfgen import canvas
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from xml.sax.saxutils import escape
 import os
 from io import BytesIO
 from PIL import Image as PILImage
@@ -202,8 +203,130 @@ def generar_reporte_depreciacion(request):
 
 
 
+_ACTIVOS_NAVY = colors.HexColor('#1B365D')
+_ACTIVOS_NAVY_SOFT = colors.HexColor('#EEF3F8')
+_ACTIVOS_GRID = colors.HexColor('#8A99A8')
+_ACTIVOS_ANCHO = 19 * cm
+
+
+def _activos_txt(valor, vacio='—'):
+    if valor is None:
+        return vacio
+    texto = str(valor).strip()
+    return texto if texto else vacio
+
+
+def _activos_campo(etiqueta, valor, style):
+    return Paragraph(f"<b>{escape(etiqueta)}:</b> {escape(_activos_txt(valor))}", style)
+
+
+def _activos_moneda(valor):
+    if valor is None:
+        return '—'
+    return f"S/ {valor:,.2f}"
+
+
+def _tarjeta_bien_activo(idx, bien, dep, value_style, header_style, money_style):
+    """Ficha compacta de un bien: una sola tabla, sin anidar (rinde con miles de filas)."""
+    denominacion = bien.descripcion or (bien.denominacion.nombre if bien.denominacion else '')
+    codigo = _activos_txt(bien.codigo_patrimonial)
+    usuario = ''
+    if bien.usuario_asignado:
+        usuario = f"{bien.usuario_asignado.apellidos}, {bien.usuario_asignado.nombres}".strip(', ')
+
+    cuenta = ''
+    if bien.cuenta_contable:
+        cuenta = bien.cuenta_contable.codigo or str(bien.cuenta_contable)
+
+    fecha_adq = bien.fecha_adquisicion.strftime('%d/%m/%Y') if bien.fecha_adquisicion else ''
+    if dep['depreciable'] and dep['tasa'] is not None:
+        tasa = f"{dep['tasa']:.2f} %"
+    else:
+        tasa = 'No dep.' if dep.get('motivo_no_depreciable') else '—'
+
+    header = Paragraph(
+        f"<b>{idx}.  {escape(_activos_txt(denominacion))}</b>"
+        f"&nbsp;&nbsp;&nbsp;Cód. patrimonial: {escape(codigo)}",
+        header_style,
+    )
+    filas = [
+        [header, '', '', ''],
+        [
+            _activos_campo('Cód. interno', bien.codigo_interno, value_style),
+            _activos_campo('Marca', bien.marca, value_style),
+            _activos_campo('Modelo', bien.modelo, value_style),
+            _activos_campo('Serie', bien.serie, value_style),
+        ],
+        [
+            _activos_campo('Local', bien.local.nombre if bien.local else '', value_style),
+            _activos_campo('Área', bien.area.nombre if bien.area else '', value_style),
+            _activos_campo('Oficina', bien.oficina.nombre if bien.oficina else '', value_style),
+            _activos_campo('Usuario', usuario, value_style),
+        ],
+        [
+            _activos_campo('Cuenta', cuenta, value_style),
+            _activos_campo('Forma adq.', bien.get_forma_adquisicion_display(), value_style),
+            _activos_campo('F. adquisición', fecha_adq, value_style),
+            _activos_campo('Doc. adq.', bien.resolucion_alta, value_style),
+        ],
+        [
+            _activos_campo('Estado', bien.get_estado_display(), value_style),
+            _activos_campo('Situación', bien.get_situacion_display(), value_style),
+            _activos_campo('Color', bien.color, value_style),
+            _activos_campo('Dimensión', bien.dimension, value_style),
+        ],
+    ]
+
+    if bien.placa or bien.numero_motor or bien.numero_chasis or bien.anio_fabricacion:
+        filas.append([
+            _activos_campo('Placa', bien.placa, value_style),
+            _activos_campo('Motor', bien.numero_motor, value_style),
+            _activos_campo('Chasis', bien.numero_chasis, value_style),
+            _activos_campo('Año', bien.anio_fabricacion, value_style),
+        ])
+
+    fila_valores = len(filas)
+    filas.append([
+        _activos_campo('Valor adquisición', _activos_moneda(bien.valor_adquisicion), money_style),
+        _activos_campo('Depreciación acum.', _activos_moneda(dep['depreciacion_acumulada']), money_style),
+        _activos_campo('Valor neto', _activos_moneda(dep['valor_neto']), money_style),
+        _activos_campo('Tasa', tasa, money_style),
+    ])
+
+    fila_otros = None
+    if bien.otros_detalles:
+        extra = Paragraph(
+            f"<b>Otros detalles:</b> {escape(_activos_txt(bien.otros_detalles))}",
+            value_style,
+        )
+        fila_otros = len(filas)
+        filas.append([KeepInFrame(_ACTIVOS_ANCHO, 1.4 * cm, [extra], mode='shrink'), '', '', ''])
+
+    anchos = [_ACTIVOS_ANCHO / 4.0] * 4
+    tabla = Table(filas, colWidths=anchos)
+    cmds = [
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BACKGROUND', (0, 0), (-1, 0), _ACTIVOS_NAVY),
+        ('BACKGROUND', (0, fila_valores), (-1, fila_valores), _ACTIVOS_NAVY_SOFT),
+        ('BOX', (0, 0), (-1, -1), 0.7, _ACTIVOS_NAVY),
+        ('INNERGRID', (0, 0), (-1, -1), 0.35, _ACTIVOS_GRID),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, 0), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING', (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+    ]
+    if fila_otros is not None:
+        cmds.append(('SPAN', (0, fila_otros), (-1, fila_otros)))
+        cmds.append(('VALIGN', (0, fila_otros), (-1, fila_otros), 'TOP'))
+    tabla.setStyle(TableStyle(cmds))
+    return KeepTogether([tabla, Spacer(1, 0.18 * cm)])
+
+
 def generar_reporte_bienes_activos(request):
-    """Reporte PDF detallado de bienes activos: una ficha con recuadro por bien.
+    """Reporte PDF detallado de bienes activos: una ficha compacta por bien.
 
     Acepta por querystring los MISMOS filtros de la búsqueda avanzada del
     listado de bienes (ver apps/bienes/filtros.py), de modo que sirve tanto
@@ -212,169 +335,102 @@ def generar_reporte_bienes_activos(request):
     """
     bienes, filtros_texto, hay_filtros = bienes_para_reporte(request)
 
-    # Crear respuesta HTTP con tipo PDF
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="{}"'.format(
         nombre_archivo('reporte_bienes_activos', 'pdf', hay_filtros)
     )
 
-    # Crear documento PDF con márgenes
     doc = SimpleDocTemplate(
         response,
         pagesize=A4,
-        leftMargin=1*cm,
-        rightMargin=1*cm,
-        topMargin=1.5*cm,
-        bottomMargin=1.5*cm
+        leftMargin=1 * cm,
+        rightMargin=1 * cm,
+        topMargin=1.3 * cm,
+        bottomMargin=1.4 * cm,
     )
     elements = []
-
     styles = getSampleStyleSheet()
 
-    # Estilo para valores de datos
     value_style = ParagraphStyle(
-        'ValueStyle',
-        parent=styles['Normal'],
-        fontSize=8,
-        fontName='Helvetica',
-        alignment=TA_LEFT
+        'ActivosValue', parent=styles['Normal'],
+        fontSize=7.5, leading=9.5, fontName='Helvetica', alignment=TA_LEFT,
+    )
+    header_style = ParagraphStyle(
+        'ActivosHeader', parent=styles['Normal'],
+        fontSize=8.5, leading=11, fontName='Helvetica-Bold',
+        alignment=TA_LEFT, textColor=colors.white,
+    )
+    money_style = ParagraphStyle(
+        'ActivosMoney', parent=styles['Normal'],
+        fontSize=7.5, leading=9.5, fontName='Helvetica-Bold', alignment=TA_LEFT,
+    )
+    total_style = ParagraphStyle(
+        'ActivosTotal', parent=styles['Normal'],
+        fontSize=8, leading=10, fontName='Helvetica-Bold',
+        alignment=TA_CENTER, textColor=colors.white,
+    )
+    total_value = ParagraphStyle(
+        'ActivosTotalVal', parent=styles['Normal'],
+        fontSize=8, leading=10, fontName='Helvetica-Bold', alignment=TA_CENTER,
     )
 
-    # Cabecera común (logo, título, entidad y filtros aplicados)
     elements.extend(cabecera_reporte(
         "REPORTE DETALLADO DE BIENES ACTIVOS",
         filtros_texto,
-        dependencia="MUNICIPALIDAD DISTRITAL DE JOSE LUIS BUS"
+        ancho_total=_ACTIVOS_ANCHO,
+        dependencia="Órgano de Control Patrimonial",
     ))
 
-    # ===== CUERPO: BIENES DETALLADOS =====
+    fecha_corte = date.today()
+    parametros_uit = list(ParametroSistema.objects.all())
     total_bienes = len(bienes)
+    suma_adq = Decimal('0.00')
+    suma_dep = Decimal('0.00')
+    suma_neto = Decimal('0.00')
 
     if bienes:
         for idx, bien in enumerate(bienes, 1):
-            # Obtener datos
-            codigo_patrimonial = bien.codigo_patrimonial or 'N/A'
-            codigo_interno = bien.codigo_interno or ''
-            denominacion = bien.denominacion.nombre if bien.denominacion else bien.descripcion or 'N/A'
-            local = bien.local.nombre if bien.local else 'N/A'
-            area = bien.area.nombre if bien.area else 'N/A'
-            oficina = bien.oficina.nombre if bien.oficina else 'N/A'
-            usuario = f"{bien.usuario_asignado.apellidos}, {bien.usuario_asignado.nombres}" if bien.usuario_asignado else 'N/A'
-            cuenta = bien.cuenta_contable.codigo if bien.cuenta_contable else 'N/A'
-            forma_adq = bien.get_forma_adquisicion_display()
-            det_tecnico = bien.otros_detalles or ''
-            valorizacion = f"{bien.valor_neto:,.2f}"
-            fecha_adq = bien.fecha_adquisicion.strftime('%d/%m/%Y') if bien.fecha_adquisicion else 'N/A'
-            estado = bien.get_estado_display()
-            doc_adq = bien.resolucion_alta or ''
-            
-            # Crear bloque para cada bien con borde
-            # Estructura según la imagen:
-            # - Primera fila: número (en caja), COD. PATRIMONIAL, COD. INT., DENOMINACION
-            # - Filas siguientes: dos columnas (izquierda y derecha)
-            
-            # Construir la tabla principal del bien
-            bien_table_data = []
-            
-            # Primera fila: número, códigos y denominación.
-            # El número va directo en la celda (sin tabla anidada) para acelerar el
-            # render de ReportLab cuando hay miles de bienes.
-            bien_table_data.append([
-                Paragraph(f"{idx}", ParagraphStyle('NumStyle', parent=styles['Normal'], fontSize=9,
-                                                   fontName='Helvetica-Bold', alignment=TA_CENTER)),
-                Paragraph(f"COD. PATRIMONIAL: {codigo_patrimonial}", value_style),
-                Paragraph(f"COD. INT.: {codigo_interno}", value_style),
-                Paragraph(f"DENOMINACION: {denominacion}", value_style)
-            ])
-            
-            # Filas siguientes: dos columnas
-            # Datos izquierda
-            datos_izq = [
-                ("LOCAL :", local),
-                ("USUARIO :", usuario),
-                ("CUENTA :", cuenta),
-                ("FORMA ADQ :", forma_adq),
-                ("DET TECNICO:", det_tecnico),
-            ]
-            
-            # Datos derecha
-            datos_der = [
-                ("AREA :", area),
-                ("OFICINA :", oficina),
-                ("VALORIZACION (S/.):", valorizacion),
-                ("FEC. ADQUISICION:", fecha_adq),
-                ("ESTADO:", estado),
-                ("DOC. ADQ.:", doc_adq),
-            ]
-            
-            # Crear filas combinadas (máximo de filas entre izquierda y derecha)
-            max_rows = max(len(datos_izq), len(datos_der))
-            
-            for i in range(max_rows):
-                # Columna izquierda
-                if i < len(datos_izq):
-                    label_izq = datos_izq[i][0]
-                    value_izq = datos_izq[i][1]
-                    texto_izq = f"{label_izq} {value_izq}"
-                else:
-                    texto_izq = ""
-                
-                # Columna derecha
-                if i < len(datos_der):
-                    label_der = datos_der[i][0]
-                    value_der = datos_der[i][1]
-                    texto_der = f"{label_der} {value_der}"
-                else:
-                    texto_der = ""
-                
-                # Agregar fila a la tabla principal
-                bien_table_data.append([
-                    "",  # Columna del número vacía
-                    Paragraph(texto_izq, value_style) if texto_izq else "",
-                    "",  # Columna código interno vacía
-                    Paragraph(texto_der, value_style) if texto_der else ""
-                ])
-            
-            # Crear tabla principal
-            bien_table = Table(bien_table_data, colWidths=[0.8*cm, 8.5*cm, 3*cm, 5.7*cm])
-            bien_table.setStyle(TableStyle([
-                ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                ('BOX', (0, 0), (0, 0), 0.5, colors.grey),  # Recuadro del número
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # Número centrado
-                ('ALIGN', (1, 0), (-1, 0), 'LEFT'),  # Primera fila a la izquierda
-                ('ALIGN', (1, 1), (1, -1), 'LEFT'),  # Columna izquierda
-                ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Columna derecha
-                ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.grey),  # Línea horizontal después de la primera fila
-            ]))
-            
-            elements.append(bien_table)
-            elements.append(Spacer(1, 0.3*cm))
+            dep = bien.calcular_depreciacion(fecha_corte, parametros=parametros_uit)
+            suma_adq += bien.valor_adquisicion or Decimal('0.00')
+            suma_dep += dep['depreciacion_acumulada'] or Decimal('0.00')
+            suma_neto += dep['valor_neto'] or Decimal('0.00')
+            elements.append(_tarjeta_bien_activo(
+                idx, bien, dep, value_style, header_style, money_style
+            ))
     else:
         elements.append(Paragraph("No se encontraron bienes activos.", styles['Normal']))
-    
-    # ===== PIE DE PÁGINA =====
-    elements.append(Spacer(1, 0.5*cm))
-    footer_table = Table(
-        [[Paragraph(f"TOTAL DE BIENES : {total_bienes}", 
-                    ParagraphStyle('FooterStyle', parent=styles['Normal'], fontSize=9, 
-                                 fontName='Helvetica-Bold', alignment=TA_RIGHT))]],
-        colWidths=[18*cm]
+
+    elements.append(Spacer(1, 0.2 * cm))
+    totales = Table(
+        [
+            [
+                Paragraph("TOTALES DEL REPORTE", total_style),
+                '', '', '',
+            ],
+            [
+                Paragraph(f"Bienes<br/>{total_bienes}", total_value),
+                Paragraph(f"Valor adquisición<br/>{_activos_moneda(suma_adq)}", total_value),
+                Paragraph(f"Depreciación acum.<br/>{_activos_moneda(suma_dep)}", total_value),
+                Paragraph(f"Valor neto<br/>{_activos_moneda(suma_neto)}", total_value),
+            ],
+        ],
+        colWidths=[_ACTIVOS_ANCHO / 4.0] * 4,
     )
-    footer_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    totales.setStyle(TableStyle([
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BACKGROUND', (0, 0), (-1, 0), _ACTIVOS_NAVY),
+        ('BACKGROUND', (0, 1), (-1, 1), _ACTIVOS_NAVY_SOFT),
+        ('BOX', (0, 0), (-1, -1), 0.7, _ACTIVOS_NAVY),
+        ('INNERGRID', (0, 0), (-1, -1), 0.35, _ACTIVOS_GRID),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
     ]))
-    elements.append(footer_table)
+    elements.append(totales)
 
-    # Construir PDF (CanvasNumerado escribe "Pág. X de Y" real al pie)
     doc.build(elements, canvasmaker=CanvasNumerado)
     return response
 

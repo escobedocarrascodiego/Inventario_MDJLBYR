@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
@@ -329,6 +330,7 @@ def traslado_bienes_index(request):
         'areas': areas,
         'personal_list': personal_list,
         'preload_json': json.dumps(preload) if preload else 'null',
+        'puede_editar_traslado': request.user.has_perm('traslados.change_trasladobien'),
     })
 
 
@@ -502,6 +504,266 @@ def ejecutar_traslado(request):
 
 
 # ==============================================================================
+# HELPERS DE LOTE DE TRASLADO
+# ==============================================================================
+
+def _traslados_del_lote(traslado):
+    """Traslados registrados en la misma operación que ``traslado``.
+
+    Un lote es el conjunto de traslados hechos con un solo clic en "Trasladar":
+    mismo usuario destino, mismo local destino y el mismo instante de registro.
+    Es la misma agrupación que usa la Ficha de Asignación (PDF).
+    """
+    return TrasladoBien.objects.filter(
+        usuario_destino_id=traslado.usuario_destino_id,
+        local_destino_id=traslado.local_destino_id,
+        fecha_traslado=traslado.fecha_traslado
+    )
+
+
+def _motivo_bloqueo_traslado(traslado, bien):
+    """Devuelve por qué un traslado ya no puede modificar el bien, o None.
+
+    Editar el destino o quitar un bien del traslado reescribe la ubicación
+    actual del bien; eso solo es seguro si el bien sigue tal como lo dejó
+    este traslado.
+    """
+    if bien.estado == 'BAJA':
+        return 'El bien está dado de baja.'
+    posterior = TrasladoBien.objects.filter(bien_id=bien.id).filter(
+        Q(fecha_traslado__gt=traslado.fecha_traslado) |
+        Q(fecha_traslado=traslado.fecha_traslado, id__gt=traslado.id)
+    ).exclude(
+        usuario_destino_id=traslado.usuario_destino_id,
+        local_destino_id=traslado.local_destino_id,
+        fecha_traslado=traslado.fecha_traslado
+    ).exists()
+    if posterior:
+        return 'El bien tiene un traslado posterior.'
+    if bien.usuario_asignado_id != traslado.usuario_destino_id:
+        return 'El bien fue reasignado a otro usuario después de este traslado.'
+    return None
+
+
+def _nombre_o_guion(obj):
+    return str(obj) if obj else '-'
+
+
+# ==============================================================================
+# EDICIÓN DE TRASLADOS
+# ==============================================================================
+
+@permiso_requerido('traslados.change_trasladobien')
+@require_http_methods(["GET"])
+def detalle_traslado(request, traslado_id):
+    """Vista AJAX: datos del lote de traslado para el formulario de edición."""
+    traslado = get_object_or_404(TrasladoBien, id=traslado_id)
+    lote = _traslados_del_lote(traslado).select_related(
+        'bien', 'bien__denominacion', 'usuario_origen', 'local_origen',
+        'area_origen', 'oficina_origen', 'ubicacion_origen',
+        'usuario_destino', 'local_destino', 'area_destino',
+        'oficina_destino', 'ubicacion_destino'
+    ).order_by('bien__codigo_patrimonial')
+
+    bienes = []
+    for t in lote:
+        motivo = _motivo_bloqueo_traslado(t, t.bien)
+        bienes.append({
+            'traslado_id': t.id,
+            'bien_id': t.bien_id,
+            'codigo_patrimonial': t.bien.codigo_patrimonial or 'N/A',
+            'descripcion': t.bien.denominacion.nombre if t.bien.denominacion else (t.bien.descripcion or 'N/A'),
+            'usuario_origen': _nombre_o_guion(t.usuario_origen),
+            'local_origen': _nombre_o_guion(t.local_origen),
+            'area_origen': _nombre_o_guion(t.area_origen),
+            'oficina_origen': _nombre_o_guion(t.oficina_origen),
+            'ubicacion_origen': _nombre_o_guion(t.ubicacion_origen),
+            'bloqueado': motivo is not None,
+            'motivo_bloqueo': motivo or '',
+        })
+
+    usuario_destino = traslado.usuario_destino
+    return JsonResponse({
+        'success': True,
+        'traslado_id': traslado.id,
+        'fecha_traslado': traslado.fecha_traslado.isoformat(),
+        'documento_autoriza': traslado.documento_autoriza or '',
+        'destino': {
+            'usuario_id': usuario_destino.id,
+            'usuario_nombre': f"{usuario_destino.apellidos}, {usuario_destino.nombres}",
+            'local_id': traslado.local_destino_id,
+            'area_id': traslado.area_destino_id,
+            'oficina_id': traslado.oficina_destino_id,
+            'ubicacion_id': traslado.ubicacion_destino_id,
+        },
+        'bienes': bienes,
+        'hay_bloqueados': any(b['bloqueado'] for b in bienes),
+    })
+
+
+@permiso_requerido('traslados.change_trasladobien')
+@require_http_methods(["POST"])
+def editar_traslado(request, traslado_id):
+    """Vista AJAX: edita un lote de traslado y actualiza los bienes afectados.
+
+    Permite cambiar el destino (usuario, local, área, oficina, ubicación
+    física), el documento que autoriza y quitar bienes del traslado (el bien
+    vuelve a su ubicación de origen). El origen no se edita: refleja dónde
+    estaba el bien realmente antes del traslado.
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Datos inválidos.'}, status=400)
+
+    def _id(valor):
+        try:
+            return int(valor) if valor not in (None, '') else None
+        except (TypeError, ValueError):
+            return None
+
+    usuario_destino_id = _id(data.get('usuario_destino_id'))
+    local_destino_id = _id(data.get('local_destino_id'))
+    area_destino_id = _id(data.get('area_destino_id'))
+    oficina_destino_id = _id(data.get('oficina_destino_id'))
+    ubicacion_destino_id = _id(data.get('ubicacion_destino_id'))
+    documento_autoriza = (data.get('documento_autoriza') or '').strip()[:255]
+    quitar_ids = {i for i in (_id(v) for v in (data.get('quitar_traslado_ids') or [])) if i}
+
+    if not usuario_destino_id:
+        return JsonResponse({'success': False, 'error': 'Debe seleccionar el usuario destino.'})
+    if not local_destino_id:
+        return JsonResponse({'success': False, 'error': 'Debe seleccionar el local destino.'})
+
+    usuario_destino = Personal.objects.filter(id=usuario_destino_id).first()
+    local_destino = Local.objects.filter(id=local_destino_id).first()
+    area_destino = Area.objects.filter(id=area_destino_id).first() if area_destino_id else None
+    oficina_destino = Oficina.objects.filter(id=oficina_destino_id).first() if oficina_destino_id else None
+    ubicacion_destino = UbicacionFisica.objects.filter(id=ubicacion_destino_id).first() if ubicacion_destino_id else None
+
+    if not usuario_destino:
+        return JsonResponse({'success': False, 'error': 'Usuario destino no encontrado.'})
+    if not local_destino:
+        return JsonResponse({'success': False, 'error': 'Local destino no encontrado.'})
+    if (area_destino_id and not area_destino) or (oficina_destino_id and not oficina_destino) \
+            or (ubicacion_destino_id and not ubicacion_destino):
+        return JsonResponse({'success': False, 'error': 'La ubicación destino seleccionada no existe.'})
+
+    # Coherencia de la jerarquía Local > Área > Oficina > Ubicación física
+    if area_destino and area_destino.local_id != local_destino.id:
+        return JsonResponse({'success': False, 'error': 'El área destino no pertenece al local seleccionado.'})
+    if oficina_destino and (not area_destino or oficina_destino.area_id != area_destino.id):
+        return JsonResponse({'success': False, 'error': 'La oficina destino no pertenece al área seleccionada.'})
+    if ubicacion_destino:
+        if not area_destino or ubicacion_destino.area_id != area_destino.id:
+            return JsonResponse({'success': False, 'error': 'La ubicación física no pertenece al área seleccionada.'})
+        if ubicacion_destino.oficina_id and ubicacion_destino.oficina_id != (oficina_destino.id if oficina_destino else None):
+            return JsonResponse({'success': False, 'error': 'La ubicación física no pertenece a la oficina seleccionada.'})
+
+    traslado = get_object_or_404(TrasladoBien, id=traslado_id)
+
+    with transaction.atomic():
+        lote = list(_traslados_del_lote(traslado).select_for_update().order_by('id'))
+        if not lote:
+            return JsonResponse({'success': False, 'error': 'El traslado ya no existe.'})
+        lote_ids = {t.id for t in lote}
+        if not quitar_ids.issubset(lote_ids):
+            return JsonResponse({'success': False, 'error': 'Algunos bienes a quitar no pertenecen a este traslado.'})
+
+        bienes = {
+            b.id: b for b in Bien.objects.select_for_update().filter(id__in=[t.bien_id for t in lote])
+        }
+
+        quitar = [t for t in lote if t.id in quitar_ids]
+        mantener = [t for t in lote if t.id not in quitar_ids]
+
+        def _cambia_destino(t):
+            return (
+                t.usuario_destino_id != usuario_destino.id or
+                t.local_destino_id != local_destino.id or
+                t.area_destino_id != (area_destino.id if area_destino else None) or
+                t.oficina_destino_id != (oficina_destino.id if oficina_destino else None) or
+                t.ubicacion_destino_id != (ubicacion_destino.id if ubicacion_destino else None)
+            )
+
+        cambia_destino = any(_cambia_destino(t) for t in mantener)
+        cambia_documento = any((t.documento_autoriza or '') != documento_autoriza for t in mantener)
+
+        if not quitar and not cambia_destino and not cambia_documento:
+            return JsonResponse({'success': False, 'error': 'No se realizaron cambios.'})
+
+        # Solo se puede tocar el bien si sigue tal como lo dejó este traslado
+        afectados = quitar + (mantener if cambia_destino else [])
+        bloqueados = []
+        for t in afectados:
+            motivo = _motivo_bloqueo_traslado(t, bienes[t.bien_id])
+            if motivo:
+                bloqueados.append(f"{bienes[t.bien_id].codigo_patrimonial}: {motivo}")
+        if bloqueados:
+            return JsonResponse({
+                'success': False,
+                'error': 'No se puede modificar la ubicación de estos bienes:\n' + '\n'.join(bloqueados)
+            })
+
+        if cambia_destino:
+            mismos_usuario = [
+                bienes[t.bien_id].codigo_patrimonial for t in mantener
+                if t.usuario_origen_id == usuario_destino.id
+            ]
+            if mismos_usuario:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'El usuario destino no puede ser el mismo usuario origen. Códigos: '
+                             + ', '.join(mismos_usuario[:8]) + ('...' if len(mismos_usuario) > 8 else '')
+                })
+
+        campos_ubicacion = ['usuario_asignado', 'local', 'area', 'oficina', 'ubicacion_fisica']
+
+        # Bienes quitados: vuelven a su ubicación de origen y se elimina su registro de traslado
+        for t in quitar:
+            bien = bienes[t.bien_id]
+            bien.usuario_asignado_id = t.usuario_origen_id
+            bien.local_id = t.local_origen_id
+            bien.area_id = t.area_origen_id
+            bien.oficina_id = t.oficina_origen_id
+            bien.ubicacion_fisica_id = t.ubicacion_origen_id
+            bien.save(update_fields=campos_ubicacion)
+            t.delete()
+
+        for t in mantener:
+            t.usuario_destino = usuario_destino
+            t.local_destino = local_destino
+            t.area_destino = area_destino
+            t.oficina_destino = oficina_destino
+            t.ubicacion_destino = ubicacion_destino
+            t.documento_autoriza = documento_autoriza
+            t.save(update_fields=[
+                'usuario_destino', 'local_destino', 'area_destino', 'oficina_destino',
+                'ubicacion_destino', 'documento_autoriza'
+            ])
+            if cambia_destino:
+                bien = bienes[t.bien_id]
+                bien.usuario_asignado = usuario_destino
+                bien.local = local_destino
+                bien.area = area_destino
+                bien.oficina = oficina_destino
+                bien.ubicacion_fisica = ubicacion_destino
+                bien.save(update_fields=campos_ubicacion)
+
+    if not mantener:
+        mensaje = 'Se anuló el traslado: todos los bienes volvieron a su ubicación de origen.'
+    else:
+        mensaje = 'Traslado actualizado correctamente.'
+        if quitar:
+            mensaje += f' Se quitaron {len(quitar)} bien(es), que volvieron a su ubicación de origen.'
+    return JsonResponse({
+        'success': True,
+        'message': mensaje,
+        'traslado_id': mantener[0].id if mantener else None,
+    })
+
+
+# ==============================================================================
 # REPORTE DE ASIGNACIÓN DE TRASLADO (PDF)
 # ==============================================================================
 
@@ -523,11 +785,7 @@ def generar_reporte_asignacion_traslado(request, traslado_id):
     )
 
     # Traslados del mismo usuario destino en la misma fecha (mismo lote)
-    traslados_mismo_lote = TrasladoBien.objects.filter(
-        usuario_destino=traslado.usuario_destino,
-        local_destino=traslado.local_destino,
-        fecha_traslado=traslado.fecha_traslado
-    ).select_related(
+    traslados_mismo_lote = _traslados_del_lote(traslado).select_related(
         'bien', 'bien__denominacion'
     ).order_by('bien__codigo_patrimonial')
 
@@ -654,14 +912,12 @@ def buscar_traslados_por_fecha(request):
             'oficina_destino'
         ).order_by('-fecha_traslado')
         
-        # Agrupar traslados por usuario destino, local destino y fecha (mismo lote)
-        # Un lote es un conjunto de traslados al mismo usuario en el mismo local en la misma fecha
+        # Agrupar traslados por lote: mismo usuario destino, local destino e instante
+        # de registro (misma agrupación que la Ficha PDF y la edición de traslados)
         traslados_agrupados = {}
-        
+
         for traslado in traslados:
-            # Crear clave única para agrupar: usuario_destino + local_destino + fecha (solo día)
-            fecha_dia = traslado.fecha_traslado.date()
-            clave = f"{traslado.usuario_destino_id}_{traslado.local_destino_id}_{fecha_dia}"
+            clave = f"{traslado.usuario_destino_id}_{traslado.local_destino_id}_{traslado.fecha_traslado.isoformat()}"
             
             if clave not in traslados_agrupados:
                 traslados_agrupados[clave] = {

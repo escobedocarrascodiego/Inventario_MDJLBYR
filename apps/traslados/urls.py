@@ -12,6 +12,8 @@ urlpatterns = [
     path('ajax/usuario/<int:pk>/ubicacion/', views.obtener_ubicacion_usuario, name='obtener_ubicacion_usuario'),
     path('ajax/ejecutar-traslado/', views.ejecutar_traslado, name='ejecutar_traslado'),
     path('ajax/buscar-traslados-por-fecha/', views.buscar_traslados_por_fecha, name='buscar_traslados_por_fecha'),
+    path('ajax/traslado/<int:traslado_id>/detalle/', views.detalle_traslado, name='detalle_traslado'),
+    path('ajax/traslado/<int:traslado_id>/editar/', views.editar_traslado, name='editar_traslado'),
 
     # URLs para Escaneo de Códigos de Barras
     path('funciones/escanear-codigos-barras/', views.escanear_codigos_barras, name='escanear_codigos_barras'),
